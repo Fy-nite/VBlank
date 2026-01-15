@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="AsmoV2.csproj" />
+  <Project Path="Iridion-core/OCRuntime/OCRuntime.csproj" />
+  <Project Path="Iridion-core/Runtimes/SharpIR/SharpIR.csproj" />
+  <Project Path="ObjectIR.MonoGame/ObjectIR.MonoGame.csproj" Id="22f20e9d-4f02-47ee-a5b9-1a89ff09083b" />
+</Solution>

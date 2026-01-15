@@ -1,0 +1,40 @@
+﻿module HelloMono
+class Program {
+    static method Main() {
+
+        ldstr "Hello, Mono OIR!"
+        call System.Console.WriteLine(string) -> void
+    
+        
+        // Clear the screen to opaque black (0xFF000000)
+        ldc 4278190080
+        call OCRuntime.PixelBindings.Clear(int64) -> void
+
+        // Draw a filled yellow rectangle at (50,50) size 100x60 (0xFFFFFF00)
+        ldc 50
+        ldc 50
+        ldc 100
+        ldc 60
+        ldc 4294967040
+        call OCRuntime.PixelBindings.FillRect(int64,int64,int64,int64,int64) -> void
+
+        // Draw a couple of red pixels
+        ldc 10
+        ldc 10
+        ldc 4294901760
+        call OCRuntime.PixelBindings.SetPixel(int64,int64,int64) -> void
+
+        ldc 11
+        ldc 11
+        ldc 4294901760
+        call OCRuntime.PixelBindings.SetPixel(int64,int64,int64) -> void  
+         ldstr "meow"
+         ldc 200
+         ldc 150
+         ldc 4294901760
+
+        call OCRuntime.Console.Prin(string,int64,int64,int64) -> void
+        
+        ret
+    }
+}

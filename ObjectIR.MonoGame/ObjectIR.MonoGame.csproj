@@ -1,0 +1,29 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Iridion-core\OCRuntime\OCRuntime.csproj" />
+    <ProjectReference Include="..\Iridion-core\Runtimes\SharpIR\SharpIR.csproj" />
+	  <PackageReference Include="MonoGame.Framework.DesktopGL" Version="3.8.*" />
+	  <PackageReference Include="MonoGame.Content.Builder.Task" Version="3.8.*" />
+	  <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
+	  <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
+	  <PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="NewFolder - Copy %284%29\" />
+    <Folder Include="NewFolder - Copy %285%29\" />
+    <Folder Include="NewFolder - Copy %286%29\" />
+    <Folder Include="NewFolder - Copy %287%29\" />
+    <Folder Include="NewFolder - Copy %288%29\" />
+    <Folder Include="Sprites\" />
+    <Folder Include="GFX\" />
+  </ItemGroup>
+
+</Project>
