@@ -1,0 +1,3 @@
+[submodule "Iridion-core"]
+	path = Iridion-core
+	url = https://git.finite.ovh/Iridion-core
