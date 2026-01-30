@@ -9,7 +9,7 @@ class Program {
         // Clear the screen to opaque black (0xFF000000)
         ldc 4278190080
         call OCRuntime.PixelBindings.Clear(int64) -> void
-
+        call OCRuntime.Audio.ButtonClick() -> void
         // Draw a filled yellow rectangle at (50,50) size 100x60 (0xFFFFFF00)
         ldc 50
         ldc 50

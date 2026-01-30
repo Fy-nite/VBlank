@@ -8,133 +8,79 @@ using Microsoft.Xna.Framework.Input;
 using ObjectIR.Core.IR;
 using ObjectIR.Core.Serialization;
 using OCRuntime;
+using SharpIR;
 using System;
+using AsmoV2.AudioEngine;
+using ObjectIR.MonoGame.SFX;
+using Adamantite.GFX;
 using System.Collections.Generic;
 using System.IO;
 using static SharpIR.CSharpParser;
+
 namespace AsmoV2
 {
-    public class Game1 : Game
+    public class AsmoGameEngine : Game
     {
-        private GraphicsDeviceManager _graphics;
+        public GraphicsDeviceManager _graphics;
         private SpriteBatch _spriteBatch;
         private Texture2D _screenTexture;
-        private Color[] _pixelData;
+        public Canvas _canvas;
         private SpriteFont _font;
         // virtual pixel buffer size (like a Pico-8 style canvas)
-        private int _bufferWidth = 360;
-        private int _bufferHeight = 360;
-        private int _scale = 3; // how much to scale the virtual canvas to the window
+        private int _bufferWidth;
+        private int _bufferHeight;
+        private float _scale = 1; // how much to scale the virtual canvas to the window
+        // out of 60 fps, how many frames have been drawn
         private int _frameCounter = 0;
-        private double _fps = 0.0;
-        private int _fpsFrameCount = 0;
-        private double _fpsElapsed = 0.0;
-        private IRRuntime _runtime;
+        private readonly Adamantite.GFX.FpsCounter _fpsCounter = new();
+        private double _fpsDisplay = 0.0;
+        public IRRuntime _runtime;
+        // Optionally host a native C# game implementing IConsoleGame
+        private Adamantite.GFX.IConsoleGame? _nativeGame;
         // Console overlay text commands (printed via SpriteFont on top of the pixel buffer)
         private readonly List<(string text, int x, int y, Color color)> _consoleTexts = new();
 
-        public Game1()
+        public AsmoGameEngine(string name, int width, int height, float scale = 0.75f)
         {
+            // set name, width and height based on parameters
             _graphics = new GraphicsDeviceManager(this);
             Content.RootDirectory = "Content";
             IsMouseVisible = true;
+            _bufferHeight = height;
+            _bufferWidth = width;
+            _scale = scale;
             // set window size based on pixel buffer and scale
-            _graphics.PreferredBackBufferWidth = _bufferWidth * _scale;
-            _graphics.PreferredBackBufferHeight = _bufferHeight * _scale;
+            //_graphics.PreferredBackBufferWidth = _bufferWidth * _scale;
+            //_graphics.PreferredBackBufferHeight = _bufferHeight * _scale;
+
+            // set window size based on the requested width and height.
+            _graphics.PreferredBackBufferWidth = (int)(width * _scale);
+            _graphics.PreferredBackBufferHeight = (int)(height * _scale);
+
             // disable VSync so the GPU is not forced to sync to the display
             _graphics.SynchronizeWithVerticalRetrace = true;
             // run Update/Draw as fast as possible (uncap FPS)
             IsFixedTimeStep = false;
-            _graphics.ApplyChanges();
-            _runtime = new IRRuntime(FileSystem.ReadAllText("Content/Main.OIR"));
+            _runtime = new IRRuntime(null);
             _runtime.EnableReflectionNativeMethods = true;
 
-     
+            _graphics.ApplyChanges();
 
-            _runtime.RegisterNativeMethod("OCRuntime.PixelBindings.SetPixel(int64,int64,int64)", (args) =>
-            {
-                Console.WriteLine("SetPixel called");
-                if (args.Length >= 3 && args[0] is long lx && args[1] is long ly && args[2] is long lc)
-                {
-                    SetPixel((int)lx, (int)ly, ColorFromLong(lc));
-                }
-                return null;
-            });
-
-            _runtime.RegisterNativeMethod("OCRuntime.PixelBindings.FillRect(int64,int64,int64,int64,int64)", (args) =>
-            {
-                Console.WriteLine("FillRect called");
-                if (args.Length >= 5 && args[0] is long sx && args[1] is long sy && args[2] is long w && args[3] is long h && args[4] is long c)
-                {
-                    DrawFilledRect((int)sx, (int)sy, (int)w, (int)h, ColorFromLong(c));
-                }
-                return null;
-            });
-
-            // Register Clear(int64) binding so Text IR can call OCRuntime.PixelBindings.Clear
-            _runtime.RegisterNativeMethod("OCRuntime.PixelBindings.Clear(int64)", (args) =>
-            {
-                Console.WriteLine("Clear called");
-                if (args.Length >= 1 && args[0] is long c)
-                {
-                    ClearPixelBuffer(ColorFromLong(c));
-                }
-                return null;
-            });
-            // Console-style bindings (PICO-8 like)
-            _runtime.RegisterNativeMethod("OCRuntime.Console.Cls(int64)", (args) =>
-            {
-                Console.WriteLine("Console.Cls called");
-                if (args.Length >= 1 && args[0] is long c)
-                {
-                    ClearPixelBuffer(ColorFromLong(c));
-                    lock (_consoleTexts)
-                    {
-                        _consoleTexts.Clear();
-                    }
-                }
-                return null;
-            });
-
-            _runtime.RegisterNativeMethod("OCRuntime.Console.PSet(int64,int64,int64)", (args) =>
-            {
-                Console.WriteLine("Console.PSet called");
-                if (args.Length >= 3 && args[0] is long lx && args[1] is long ly && args[2] is long lc)
-                {
-                    SetPixel((int)lx, (int)ly, ColorFromLong(lc));
-                }
-                return null;
-            });
-
-            _runtime.RegisterNativeMethod("OCRuntime.Console.RectFill(int64,int64,int64,int64,int64)", (args) =>
-            {
-                Console.WriteLine("Console.RectFill called");
-                if (args.Length >= 5 && args[0] is long sx && args[1] is long sy && args[2] is long w && args[3] is long h && args[4] is long c)
-                {
-                    DrawFilledRect((int)sx, (int)sy, (int)w, (int)h, ColorFromLong(c));
-                }
-                return null;
-            });
-
-            _runtime.RegisterNativeMethod("OCRuntime.Console.Prin(string,int64,int64,int64)", (args) =>
-            {
-                Console.WriteLine("Console.Prin called");
-                if (args.Length >= 4 && args[0] is string s && args[1] is long px && args[2] is long py && args[3] is long pc)
-                {
-                    lock (_consoleTexts)
-                    {
-                        _consoleTexts.Add((s, (int)px, (int)py, ColorFromLong(pc)));
-                    }
-                }
-                return null;
-            });
-            // Ensure runtime exceptions are reported
-            _runtime.OnException += (ex) =>
-            {
-                Console.WriteLine("Runtime Exception: " + ex.ToString());
-            };
+            // register builtin runtime bindings (pixels, console, audio, etc.)
+            RegisterRuntimeBindings(_runtime);
         }
 
+        /// <summary>
+        /// Host a native C# game (must implement IConsoleGame). Call before Run()/LoadContent.
+        /// </summary>
+        public void HostNativeGame(Adamantite.GFX.IConsoleGame native)
+        {
+            _nativeGame = native ?? throw new ArgumentNullException(nameof(native));
+        }
+        public void Init(string name, int width, int height)
+        {
+            
+        }
         protected override void Initialize()
         {
             // TODO: Add initialization logic here
@@ -152,22 +98,50 @@ namespace AsmoV2
 
             // create the Texture2D that will hold the pixel buffer
             _screenTexture = new Texture2D(GraphicsDevice, _bufferWidth, _bufferHeight, false, SurfaceFormat.Color);
-            _pixelData = new Color[_bufferWidth * _bufferHeight];
-            ClearPixelBuffer(Color.Black);
-
-            // Run the IR now that the pixel buffer and texture are initialized
-            _runtime.Run();
+            _canvas = new Canvas(_bufferWidth, _bufferHeight);
+            _canvas.Clear(Color.Black);
             // Ensure the texture reflects any immediate pixel changes
-            _screenTexture.SetData(_pixelData);
+            _screenTexture.SetData(_canvas.PixelData);
+
+            // Initialize audio subsystem with the game's Content manager so audio assets can be loaded
+            Subsystem.Initialize(Content);
+            // If a native game is hosted, initialize it instead of running the IR runtime
+            if (_nativeGame != null)
+            {
+                _nativeGame.Init(_canvas);
+            }
+            else
+            {
+                // Run the IR now that the pixel buffer and texture are initialized
+                _runtime.Run();
+            }
+        }
+
+        protected override void UnloadContent()
+        {
+            // Shutdown audio subsystem and release precomputed assets
+            Subsystem.Shutdown();
+            
+            base.UnloadContent();
         }
 
         protected override void Update(GameTime gameTime)
         {
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
-                Exit();
+                Button.PlayClick(Subsystem.Sound);
 
             //ClearPixelBuffer(Color.Black);
-            _screenTexture.SetData(_pixelData);
+            // If hosting a native game, update it (it will draw into the canvas). Otherwise the IR runtime updates the canvas.
+            if (_nativeGame != null)
+            {
+                _nativeGame.Update(gameTime.ElapsedGameTime.TotalSeconds);
+            }
+
+            // Update fps counter
+            _fpsCounter.Tick(gameTime.ElapsedGameTime.TotalSeconds);
+            _fpsDisplay = _fpsCounter.Fps;
+
+            if (_canvas != null) _screenTexture.SetData(_canvas.PixelData);
 
             base.Update(gameTime);
         }
@@ -176,24 +150,26 @@ namespace AsmoV2
         {
             GraphicsDevice.Clear(Color.Black);
 
-            // update fps counter based on actual draws
-            _fpsFrameCount++;
-            _fpsElapsed += gameTime.ElapsedGameTime.TotalSeconds;
-            if (_fpsElapsed >= 1.0)
+            // update fps counter based on actual draws (value updated in Update via FpsCounter)
+
+            // If hosting a native game, let it draw into the canvas before presenting
+            if (_nativeGame != null)
             {
-                _fps = _fpsFrameCount / _fpsElapsed;
-                _fpsFrameCount = 0;
-                _fpsElapsed = 0.0;
+                _nativeGame.Draw(_canvas);
             }
 
             // Draw the pixel buffer scaled to the window using point sampling
             _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
-            _spriteBatch.Draw(_screenTexture, new Rectangle(0, 0, _bufferWidth * _scale, _bufferHeight * _scale), Color.White);
+            _spriteBatch.Draw(
+                _screenTexture,
+                new Rectangle(0, 0, (int)(_bufferWidth * _scale), (int)(_bufferHeight * _scale)),
+                Color.White
+            );
             _spriteBatch.End();
 
             // Draw FPS and console overlay using a regular sprite batch (no point sampling required)
             _spriteBatch.Begin();
-            _spriteBatch.DrawString(_font, $"FPS: {_fps:F1}", new Vector2(4, 4), Color.White);
+            _spriteBatch.DrawString(_font, $"FPS: {_fpsDisplay:F1}", new Vector2(4, 4), Color.White);
 
             lock (_consoleTexts)
             {
@@ -238,42 +214,188 @@ namespace AsmoV2
 
         }
 
-        // Helpers for manipulating the virtual pixel buffer
-        private void ClearPixelBuffer(Color c)
+        // Pixel buffer manipulation has been moved to `Adamantite.GFX.Canvas`.
+        /// <summary>
+        /// loads the entrypoint for a ObjectIR file
+        /// </summary>
+        /// <param name="FileName">the file to load from the filesystem</param>
+        public void LoadEntry(string FileName)
         {
-            for (int i = 0; i < _pixelData.Length; i++) _pixelData[i] = c;
-        }
-
-        private void SetPixel(int x, int y, Color c)
-        {
-            if (x < 0 || x >= _bufferWidth || y < 0 || y >= _bufferHeight) return;
-            _pixelData[y * _bufferWidth + x] = c;
-        }
-
-        private void DrawFilledRect(int startX, int startY, int w, int h, Color c)
-        {
-            for (int yy = 0; yy < h; yy++)
+            // Load the entry file text and create a new runtime from it.
+            if (!System.IO.File.Exists(FileName))
             {
-                int py = startY + yy;
-                if (py < 0 || py >= _bufferHeight) continue;
-                for (int xx = 0; xx < w; xx++)
+                Console.WriteLine($"LoadEntry: file not found: {FileName}");
+                return;
+            }
+
+            string text;
+            // If a C# source file is provided, compile it to TextIR/ObjectIR first
+            if (string.Equals(Path.GetExtension(FileName), ".cs", StringComparison.OrdinalIgnoreCase))
+            {
+                try
                 {
-                    int px = startX + xx;
-                    if (px < 0 || px >= _bufferWidth) continue;
-                    SetPixel(px, py, c);
+                    text = CompileCSharp(FileName);
                 }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("CompileCSharp error: " + ex.Message);
+                    return;
+                }
+            }
+            else
+            {
+                text = System.IO.File.ReadAllText(FileName);
+            }
+
+            // Create runtime from the file contents (auto-detect format)
+            try
+            {
+                _runtime = new IRRuntime(text);
+                _runtime.EnableReflectionNativeMethods = true;
+                RegisterRuntimeBindings(_runtime);
+                _runtime.OnException += (ex) => Console.WriteLine("Runtime Exception: " + ex.ToString());
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("LoadEntry error: " + ex.Message);
             }
         }
 
-        private static Color ColorFromLong(long value)
+        private void RegisterRuntimeBindings(IRRuntime runtime)
         {
-            // Expect ARGB packed into 0xAARRGGBB
-            uint v = (uint)value;
-            byte a = (byte)(v >> 24);
-            byte r = (byte)(v >> 16);
-            byte g = (byte)(v >> 8);
-            byte b = (byte)(v & 0xFF);
-            return new Color(r, g, b, a);
+            // Pixel bindings
+            runtime.RegisterNativeMethod("OCRuntime.PixelBindings.SetPixel(int64,int64,int64)", (i, args) =>
+            {
+                if (args.Length >= 3 && args[0] is long lx && args[1] is long ly && args[2] is long lc)
+                {
+                    _canvas?.SetPixel((int)lx, (int)ly, Canvas.ColorFromLong(lc));
+                }
+                return null;
+            });
+
+            runtime.RegisterNativeMethod("OCRuntime.PixelBindings.FillRect(int64,int64,int64,int64,int64)", (i, args) =>
+            {
+                if (args.Length >= 5 && args[0] is long sx && args[1] is long sy && args[2] is long w && args[3] is long h && args[4] is long c)
+                {
+                    _canvas?.DrawFilledRect((int)sx, (int)sy, (int)w, (int)h, Canvas.ColorFromLong(c));
+                }
+                return null;
+            });
+
+            runtime.RegisterNativeMethod("OCRuntime.PixelBindings.Clear(int64)", (i, args) =>
+            {
+                if (args.Length >= 1 && args[0] is long c)
+                {
+                    _canvas?.Clear(Canvas.ColorFromLong(c));
+                }
+                return null;
+            });
+
+            // Console
+            runtime.RegisterNativeMethod("OCRuntime.Console.Cls(int64)", (i, args) =>
+            {
+                if (args.Length >= 1 && args[0] is long c)
+                {
+                    _canvas?.Clear(Canvas.ColorFromLong(c));
+                    lock (_consoleTexts)
+                    {
+                        _consoleTexts.Clear();
+                    }
+                }
+                return null;
+            });
+
+            runtime.RegisterNativeMethod("OCRuntime.Console.PSet(int64,int64,int64)", (i, args) =>
+            {
+                if (args.Length >= 3 && args[0] is long lx && args[1] is long ly && args[2] is long lc)
+                {
+                    _canvas?.SetPixel((int)lx, (int)ly, Canvas.ColorFromLong(lc));
+                }
+                return null;
+            });
+
+            runtime.RegisterNativeMethod("OCRuntime.Console.RectFill(int64,int64,int64,int64,int64)", (i, args) =>
+            {
+                if (args.Length >= 5 && args[0] is long sx && args[1] is long sy && args[2] is long w && args[3] is long h && args[4] is long c)
+                {
+                    _canvas?.DrawFilledRect((int)sx, (int)sy, (int)w, (int)h, Canvas.ColorFromLong(c));
+                }
+                return null;
+            });
+
+            runtime.RegisterNativeMethod("OCRuntime.Console.Prin(string,int64,int64,int64)", (i, args) =>
+            {
+                if (args.Length >= 4 && args[0] is string s && args[1] is long px && args[2] is long py && args[3] is long pc)
+                {
+                    lock (_consoleTexts)
+                    {
+                        _consoleTexts.Add((s, (int)px, (int)py, Canvas.ColorFromLong(pc)));
+                    }
+                }
+                return null;
+            });
+
+            // Audio: play one-shot by asset name
+            runtime.RegisterNativeMethod("OCRuntime.Audio.PlayOneShot(string)", (i, args) =>
+            {
+                if (args.Length >= 1 && args[0] is string asset)
+                {
+                    try
+                    {
+                        if (Subsystem.Sound != null) Subsystem.Sound.PlayOneShot(asset);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Audio.PlayOneShot error: " + ex.Message);
+                    }
+                }
+                return null;
+            });
+
+            runtime.RegisterNativeMethod("OCRuntime.Audio.ButtonClick()", (i, args) =>
+            {
+                try
+                {
+                    if (Subsystem.Sound != null)
+                    {
+                        Button.PlayClick(Subsystem.Sound);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("Audio.ButtonClick error: " + ex.Message);
+                }
+                return null;
+            });
+
+            // Synth: generate a sine note and play via SoundSystem precomputed cache.
+            runtime.RegisterNativeMethod("OCRuntime.Audio.SynthPlay(int64,double)", (i, args) =>
+            {
+                // args: midiNote (int64), durationSeconds (double)
+                try
+                {
+                    if (args.Length >= 2 && args[0] is long midi && (args[1] is double || args[1] is float || args[1] is long))
+                    {
+                        int midiNote = (int)midi;
+                        double dur = Convert.ToDouble(args[1]);
+                        var key = $"synth_{midiNote}_{dur}";
+                        if (Subsystem.Sound != null)
+                        {
+                            var se = Subsystem.Sound.GetOrCreatePrecomputed(key, () =>
+                            {
+                                var pcm = SimpleSynth.GenerateSineWavePcm((float)SimpleSynth.MidiNoteToFrequency(midiNote), (float)dur);
+                                return new Microsoft.Xna.Framework.Audio.SoundEffect(pcm, 44100, Microsoft.Xna.Framework.Audio.AudioChannels.Mono);
+                            });
+                            Subsystem.Sound.PlayOneShot(se);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("SynthPlay error: " + ex.Message);
+                }
+                return null;
+            });
         }
     }
 }

@@ -46,6 +46,7 @@
   <ItemGroup>
     <ProjectReference Include="Iridion-core\OCRuntime\OCRuntime.csproj" />
     <ProjectReference Include="Iridion-core\Runtimes\SharpIR\SharpIR.csproj" />
+    <ProjectReference Include="ObjectIR.MonoGame\Adamantite.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Update="Content\Main.OIR">
