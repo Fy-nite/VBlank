@@ -1,3 +1,15 @@
 [submodule "Iridion-core"]
 	path = Iridion-core
 	url = https://git.finite.ovh/Iridion-core
+[submodule "lantanite"]
+	path = lantanite
+	url = https://github.com/fy-nite/lantanite
+[submodule "starchart"]
+	path = starchart
+	url = https://github.com/fy-nite/starchart
+[submodule "Chippy"]
+	path = Chippy
+	url = https://github.com/fy-nite/Chippy
+[submodule "jakarada"]
+	path = jakarada
+	url = https://github.com/fy-nite/jakarada
