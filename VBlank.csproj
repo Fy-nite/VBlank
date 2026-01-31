@@ -11,12 +11,24 @@
     <ApplicationIcon>Icon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Chippy\**" />
     <Compile Remove="Iridion-core\**" />
+    <Compile Remove="jakarada\**" />
+    <Compile Remove="lantanite\**" />
     <Compile Remove="ObjectIR.MonoGame\**" />
+    <Compile Remove="starchart\**" />
+    <EmbeddedResource Remove="Chippy\**" />
     <EmbeddedResource Remove="Iridion-core\**" />
+    <EmbeddedResource Remove="jakarada\**" />
+    <EmbeddedResource Remove="lantanite\**" />
     <EmbeddedResource Remove="ObjectIR.MonoGame\**" />
+    <EmbeddedResource Remove="starchart\**" />
+    <None Remove="Chippy\**" />
     <None Remove="Iridion-core\**" />
+    <None Remove="jakarada\**" />
+    <None Remove="lantanite\**" />
     <None Remove="ObjectIR.MonoGame\**" />
+    <None Remove="starchart\**" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Content\DefaultFont.spritefont" />
@@ -46,6 +58,7 @@
   <ItemGroup>
     <ProjectReference Include="Iridion-core\OCRuntime\OCRuntime.csproj" />
     <ProjectReference Include="Iridion-core\Runtimes\SharpIR\SharpIR.csproj" />
+    <ProjectReference Include="jakarada\src\Jakarada.Core\Jakarada.Core.csproj" />
     <ProjectReference Include="ObjectIR.MonoGame\Adamantite.csproj" />
   </ItemGroup>
   <ItemGroup>

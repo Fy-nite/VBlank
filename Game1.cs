@@ -358,20 +358,6 @@ namespace AsmoV2
 
             if (_canvas != null)
             {
-                // Draw a small box at the mouse position (convert window coords to canvas coords)
-                try
-                {
-                    var ms = Microsoft.Xna.Framework.Input.Mouse.GetState();
-                    int cx = (int)(ms.X / Math.Max(0.0001f, _scale));
-                    int cy = (int)(ms.Y / Math.Max(0.0001f, _scale));
-                    // draw a 9x9 outlined box so it's visible regardless of background
-                    _canvas.DrawOutlinedRect(cx - 4, cy - 4, 9, 9, Colors.Yellow);
-                }
-                catch
-                {
-                    // ignore any input-to-canvas mapping errors
-                }
-
                 // Process input for UI (map window to canvas coordinates using current scale)
                 try { UI.ProcessInput(_scale); } catch { }
                 // Let UI manager render its dirty regions first (if any). This will mark canvas pixels directly.

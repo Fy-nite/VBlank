@@ -1,10 +1,9 @@
 <Solution>
-  <Project Path="../Chippy/Chippy.csproj" Id="b7f907ae-d62b-407c-9c81-dab399a46c51" />
-  <Project Path="../jakarada/src/Jakarada.Core/Jakarada.Core.csproj" />
-  <Project Path="../lantanite/lantanite.csproj" Id="e572f395-614b-4bae-bcae-3f73c0e3e4bd" />
-  <Project Path="../StarChart/StarChart.csproj" Id="c3f4807d-34f6-478c-9852-52a978df1f15" />
+  <Project Path="Chippy/Chippy.csproj" />
   <Project Path="Iridion-core/OCRuntime/OCRuntime.csproj" />
   <Project Path="Iridion-core/Runtimes/SharpIR/SharpIR.csproj" />
+  <Project Path="jakarada/src/Jakarada.Core/Jakarada.Core.csproj" />
   <Project Path="ObjectIR.MonoGame/Adamantite.csproj" Id="22f20e9d-4f02-47ee-a5b9-1a89ff09083b" />
+  <Project Path="starchart/StarChart.csproj" />
   <Project Path="VBlank.csproj" />
 </Solution>
