@@ -108,7 +108,13 @@ namespace AsmoV2
             _graphics.SynchronizeWithVerticalRetrace = true;
             // run Update/Draw as fast as possible (uncap FPS)
             IsFixedTimeStep = false;
-            _runtime = new IRRuntime(null);
+            if (!string.IsNullOrEmpty(name))
+            {
+                Window.Title = name;
+            }
+            // _runtime = new IRRuntime(null);
+            if (_runtime == null)
+                _runtime = new IRRuntime("module test version 1.0.0");
             _runtime.EnableReflectionNativeMethods = true;
 
             _graphics.ApplyChanges();
@@ -448,31 +454,31 @@ namespace AsmoV2
 
         private static string CompileCSharp(string filePath)
         {
-            Console.WriteLine($"Parsing file: {filePath}");
-            // Read the file content
-            string code = File.ReadAllText(filePath);
-            // Parse the code into a SyntaxTree (the AST)
-            SyntaxTree tree = CSharpSyntaxTree.ParseText(code);
-            // Create compilation for semantic analysis
-            var compilation = CSharpCompilation.Create("OIRTemp")
-                .AddReferences(MetadataReference.CreateFromFile(typeof(object).Assembly.Location))
-                .AddReferences(MetadataReference.CreateFromFile(typeof(Console).Assembly.Location))
-                .AddReferences(MetadataReference.CreateFromFile(typeof(System.Linq.Enumerable).Assembly.Location))
-                .AddReferences(MetadataReference.CreateFromFile(typeof(System.Collections.Generic.List<>).Assembly.Location))
-                .AddSyntaxTrees(tree);
-            var semanticModel = compilation.GetSemanticModel(tree);
-            // Get the root of the AST
-            CompilationUnitSyntax root = (CompilationUnitSyntax)tree.GetRoot();
-            // Create ObjectIR module
-            var module = new Module(Path.GetFileNameWithoutExtension(filePath));
-            // Traverse the AST to extract information and build IR
-            var walker = new CodeWalker(semanticModel, module, true);
-            walker.Visit(root);
-            // Output ObjectIR
-            var serializer = new ModuleSerializer(module);
-            var oir = serializer.DumpToIRCode();
+            // Console.WriteLine($"Parsing file: {filePath}");
+            // // Read the file content
+            // string code = File.ReadAllText(filePath);
+            // // Parse the code into a SyntaxTree (the AST)
+            // SyntaxTree tree = CSharpSyntaxTree.ParseText(code);
+            // // Create compilation for semantic analysis
+            // var compilation = CSharpCompilation.Create("OIRTemp")
+            //     .AddReferences(MetadataReference.CreateFromFile(typeof(object).Assembly.Location))
+            //     .AddReferences(MetadataReference.CreateFromFile(typeof(Console).Assembly.Location))
+            //     .AddReferences(MetadataReference.CreateFromFile(typeof(System.Linq.Enumerable).Assembly.Location))
+            //     .AddReferences(MetadataReference.CreateFromFile(typeof(System.Collections.Generic.List<>).Assembly.Location))
+            //     .AddSyntaxTrees(tree);
+            // var semanticModel = compilation.GetSemanticModel(tree);
+            // // Get the root of the AST
+            // CompilationUnitSyntax root = (CompilationUnitSyntax)tree.GetRoot();
+            // // Create ObjectIR module
+            // var module = new Module(Path.GetFileNameWithoutExtension(filePath));
+            // // Traverse the AST to extract information and build IR
+            // var walker = new CodeWalker(semanticModel, module, true);
+            // walker.Visit(root);
+            // // Output ObjectIR
+            // var serializer = new ModuleSerializer(module);
+            // var oir = serializer.DumpToIRCode();
 
-            return oir;
+            return "// C# to ObjectIR compilation is not yet implemented.";
 
         }
 
