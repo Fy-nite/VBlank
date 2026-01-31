@@ -1,0 +1,4 @@
+Name=hello.service
+Description=Hello assembly service
+ExecStart=asm:/bin/apps/hello.asm
+WantedBy=multi-user.target
