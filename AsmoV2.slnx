@@ -4,6 +4,6 @@
   <Project Path="Iridion-core/Runtimes/SharpIR/SharpIR.csproj" />
   <Project Path="jakarada/src/Jakarada.Core/Jakarada.Core.csproj" />
   <Project Path="ObjectIR.MonoGame/Adamantite.csproj" Id="22f20e9d-4f02-47ee-a5b9-1a89ff09083b" />
-  <Project Path="starchart/StarChart.csproj" />
+  <Project Path="StarChart/StarChart.csproj" />
   <Project Path="VBlank.csproj" />
 </Solution>

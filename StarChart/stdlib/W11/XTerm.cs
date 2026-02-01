@@ -156,6 +156,7 @@ namespace StarChart.stdlib.W11
             _buffer[_cursorY, _cursorX] = ch;
             _cursorX++;
             if (_cursorX >= _cols) NewLine();
+            _dirty = true;
         }
 
         void NewLine()

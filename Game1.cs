@@ -10,6 +10,7 @@ using ObjectIR.Core.Serialization;
 using OCRuntime;
 using SharpIR;
 using System;
+using System.Diagnostics;
 using AsmoV2.AudioEngine;
 using ObjectIR.MonoGame.SFX;
 using Adamantite.GFX;
@@ -28,6 +29,19 @@ namespace AsmoV2
 
     public class AsmoGameEngine : Game
     {
+        // Runtime-configurable backend selector. Set environment variable ASMO_BACKEND=SDL to use Silk.NET/SDL backend.
+        enum BackendType { MonoGame, SilkSDL }
+        static BackendType DetectBackend()
+        {
+            try
+            {
+                var v = Environment.GetEnvironmentVariable("ASMO_BACKEND");
+                if (!string.IsNullOrEmpty(v) && v.Equals("SDL", StringComparison.OrdinalIgnoreCase))
+                    return BackendType.SilkSDL;
+            }
+            catch { }
+            return BackendType.MonoGame;
+        }
         // UI manager responsible for retained UI and dirty-region rendering
         public Adamantite.GFX.UI.UIManager UI { get; } = new Adamantite.GFX.UI.UIManager();
         // Simple window sizing policy that callers can configure per-application.
@@ -90,7 +104,22 @@ namespace AsmoV2
         public AsmoGameEngine(string name, int width, int height, float scale = 0.75f)
         {
             // set name, width and height based on parameters
-            _graphics = new GraphicsDeviceManager(this);
+            // Detect backend; we still construct MonoGame GraphicsDeviceManager by default but log init failures.
+            var backend = DetectBackend();
+            if (backend == BackendType.SilkSDL)
+            {
+                Console.Error.WriteLine("ASMO: Using SilkSDL backend (ASMO_BACKEND=SDL)");
+            }
+            try
+            {
+                _graphics = new GraphicsDeviceManager(this);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine("ASMO: GraphicsDeviceManager init failed: " + ex.Message);
+                Console.Error.WriteLine(ex.ToString());
+                throw;
+            }
             Content.RootDirectory = "Content";
             IsMouseVisible = true;
             _bufferHeight = height;
@@ -142,6 +171,12 @@ namespace AsmoV2
 
             // register builtin runtime bindings (pixels, console, audio, etc.)
             RegisterRuntimeBindings(_runtime);
+
+            // Log unhandled exceptions to stderr to aid debugging on Linux/macOS
+            AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            {
+                try { Console.Error.WriteLine("ASMO Unhandled exception: " + e.ExceptionObject?.ToString()); } catch { }
+            };
 
             // Setup a simple VFS: mount physical folder "root" next to exe as "/"
             var vfs = new Adamantite.VFS.VfsManager();
@@ -290,7 +325,16 @@ namespace AsmoV2
             _canvas = new Canvas(_bufferWidth, _bufferHeight);
             _canvas.Clear(Color.Black);
             // Ensure the texture reflects any immediate pixel changes
-            _screenTexture.SetData(_canvas.PixelData);
+            try
+            {
+                var rect = new Rectangle(0, 0, _canvas.width, _canvas.height);
+                _screenTexture.SetData(0, rect, _canvas.PixelData, 0, _canvas.PixelData.Length);
+            }
+            catch
+            {
+                // Fallback to naive SetData when explicit rectangle fails
+                _screenTexture.SetData(_canvas.PixelData);
+            }
 
             // Initialize audio subsystem with the game's Content manager so audio assets can be loaded
             Subsystem.Initialize(Content);
@@ -380,8 +424,11 @@ namespace AsmoV2
                 if (regions.Count > 0)
                 {
                     var pool = System.Buffers.ArrayPool<Color>.Shared;
+                    var swUpload = Stopwatch.StartNew();
+                    long totalPixels = 0;
                     try
                     {
+                        // Compute total pixels to upload
                         foreach (var r in regions)
                         {
                             int dx = Math.Max(0, r.X);
@@ -389,26 +436,77 @@ namespace AsmoV2
                             int dw = Math.Min(_canvas.width - dx, r.Width);
                             int dh = Math.Min(_canvas.height - dy, r.Height);
                             if (dw <= 0 || dh <= 0) continue;
-                            int len = dw * dh;
-                            Color[] regionData = pool.Rent(len);
+                            totalPixels += (long)dw * dh;
+                        }
+
+                        bool forceFull = false;
+                        try
+                        {
+                            var m = Environment.GetEnvironmentVariable("ASMO_UPLOAD_MODE");
+                            if (!string.IsNullOrEmpty(m) && m.Equals("FULL", StringComparison.OrdinalIgnoreCase)) forceFull = true;
+                        }
+                        catch { }
+
+                        long fullPixels = (long)_canvas.width * _canvas.height;
+                        bool doFull = forceFull || (totalPixels > (fullPixels / 4));
+
+                        if (doFull)
+                        {
+                            int len = _canvas.width * _canvas.height;
+                            Color[] full = pool.Rent(len);
                             try
                             {
-                                for (int yy = 0; yy < dh; yy++)
+                                Array.Copy(_canvas.PixelData, 0, full, 0, len);
+                                try
                                 {
-                                    Array.Copy(_canvas.PixelData, (dy + yy) * _canvas.width + dx, regionData, yy * dw, dw);
+                                    var rect = new Rectangle(0, 0, _canvas.width, _canvas.height);
+                                    _screenTexture.SetData(0, rect, full, 0, len);
                                 }
-                                var region = new Rectangle(dx, dy, dw, dh);
-                                _screenTexture.SetData(0, region, regionData, 0, len);
+                                catch
+                                {
+                                    _screenTexture.SetData(full);
+                                }
                             }
                             finally
                             {
-                                pool.Return(regionData);
+                                pool.Return(full);
+                            }
+                        }
+                        else
+                        {
+                            foreach (var r in regions)
+                            {
+                                int dx = Math.Max(0, r.X);
+                                int dy = Math.Max(0, r.Y);
+                                int dw = Math.Min(_canvas.width - dx, r.Width);
+                                int dh = Math.Min(_canvas.height - dy, r.Height);
+                                if (dw <= 0 || dh <= 0) continue;
+                                int len = dw * dh;
+                                Color[] regionData = pool.Rent(len);
+                                try
+                                {
+                                    for (int yy = 0; yy < dh; yy++)
+                                    {
+                                        Array.Copy(_canvas.PixelData, (dy + yy) * _canvas.width + dx, regionData, yy * dw, dw);
+                                    }
+                                    var region = new Rectangle(dx, dy, dw, dh);
+                                    _screenTexture.SetData(0, region, regionData, 0, len);
+                                }
+                                finally
+                                {
+                                    pool.Return(regionData);
+                                }
                             }
                         }
                     }
                     finally
                     {
+                        swUpload.Stop();
                         _canvas.ClearDirty();
+                        if (swUpload.ElapsedMilliseconds > 10)
+                        {
+                            Console.Error.WriteLine($"ASMO: texture upload took {swUpload.ElapsedMilliseconds}ms for {regions.Count} regions (totalPixels={totalPixels})");
+                        }
                     }
                 }
             }
