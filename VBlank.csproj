@@ -59,7 +59,7 @@
     <ProjectReference Include="Iridion-core\OCRuntime\OCRuntime.csproj" />
     <ProjectReference Include="Iridion-core\Runtimes\SharpIR\SharpIR.csproj" />
     <ProjectReference Include="jakarada\src\Jakarada.Core\Jakarada.Core.csproj" />
-    <ProjectReference Include="ObjectIR.MonoGame\Adamantite.csproj" />
+    <ProjectReference Include="Adamantite\CSharp\Adamantite.csproj" />
 
   </ItemGroup>
   <ItemGroup>
