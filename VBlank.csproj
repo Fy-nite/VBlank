@@ -11,18 +11,22 @@
     <ApplicationIcon>Icon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Adamantite\Adamantite.CSharp\**" />
+    <Compile Remove="VBlank.Abstractions\**" />
     <Compile Remove="Chippy\**" />
     <Compile Remove="Iridion-core\**" />
     <Compile Remove="jakarada\**" />
     <Compile Remove="lantanite\**" />
     <Compile Remove="ObjectIR.MonoGame\**" />
     <Compile Remove="starchart\**" />
+    <EmbeddedResource Remove="Adamantite\Adamantite.CSharp\**" />
     <EmbeddedResource Remove="Chippy\**" />
     <EmbeddedResource Remove="Iridion-core\**" />
     <EmbeddedResource Remove="jakarada\**" />
     <EmbeddedResource Remove="lantanite\**" />
     <EmbeddedResource Remove="ObjectIR.MonoGame\**" />
     <EmbeddedResource Remove="starchart\**" />
+    <None Remove="Adamantite\Adamantite.CSharp\**" />
     <None Remove="Chippy\**" />
     <None Remove="Iridion-core\**" />
     <None Remove="jakarada\**" />
@@ -31,6 +35,7 @@
     <None Remove="starchart\**" />
   </ItemGroup>
   <ItemGroup>
+    <None Remove="Content\Content.mgcb" />
     <None Remove="Content\DefaultFont.spritefont" />
     <None Remove="Icon.ico" />
     <None Remove="Icon.bmp" />
@@ -59,12 +64,19 @@
     <ProjectReference Include="Iridion-core\OCRuntime\OCRuntime.csproj" />
     <ProjectReference Include="Iridion-core\Runtimes\SharpIR\SharpIR.csproj" />
     <ProjectReference Include="jakarada\src\Jakarada.Core\Jakarada.Core.csproj" />
-    <ProjectReference Include="Adamantite\CSharp\Adamantite.csproj" />
+    <ProjectReference Include="Adamantite\Adamantite.CSharp\Adamantite.csproj" />
+    <ProjectReference Include="VBlank.Abstractions\VBlank.Abstractions.csproj" />
 
   </ItemGroup>
   <ItemGroup>
     <None Update="Content\Main.OIR">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="VBlank\" />
+  </ItemGroup>
+  <ItemGroup>
+    <MonoGameContentReference Include="Content\Content.mgcb" />
   </ItemGroup>
 </Project>

@@ -14,6 +14,7 @@ using System.Diagnostics;
 using AsmoV2.AudioEngine;
 using ObjectIR.MonoGame.SFX;
 using Adamantite.GFX;
+using Adamantite.GPU;
 using System.Collections.Generic;
 using System.IO;
 using static SharpIR.CSharpParser;
@@ -27,7 +28,7 @@ namespace AsmoV2
     }
 
 
-    public class AsmoGameEngine : Game
+    public partial class AsmoGameEngine : Game
     {
         // Runtime-configurable backend selector. Set environment variable ASMO_BACKEND=SDL to use Silk.NET/SDL backend.
         enum BackendType { MonoGame, SilkSDL }
@@ -69,7 +70,7 @@ namespace AsmoV2
                 ApplyWindowPolicy();
             }
         }
-        public GraphicsDeviceManager _graphics;
+        public GraphicsDeviceManager? _graphics;
         private SpriteBatch _spriteBatch;
         private Texture2D _screenTexture;
         public Canvas _canvas;
@@ -101,6 +102,13 @@ namespace AsmoV2
         public int BufferWidth => _bufferWidth;
         public int BufferHeight => _bufferHeight;
 
+        // SDL adapter (optional)
+        private SDLAdapterRenderer? _sdlAdapter;
+        private Surface? _sdlSurface;
+        private bool _useSdl = false;
+        // Engine-level render backend (adapter implementing AsmoV2.IRenderBackend)
+        private IRenderBackend? _renderBackend;
+
         public AsmoGameEngine(string name, int width, int height, float scale = 0.75f)
         {
             // set name, width and height based on parameters
@@ -109,16 +117,21 @@ namespace AsmoV2
             if (backend == BackendType.SilkSDL)
             {
                 Console.Error.WriteLine("ASMO: Using SilkSDL backend (ASMO_BACKEND=SDL)");
+                _useSdl = true;
             }
-            try
+            // Only initialize MonoGame GraphicsDeviceManager when not using SDL backend
+            if (!_useSdl)
             {
-                _graphics = new GraphicsDeviceManager(this);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine("ASMO: GraphicsDeviceManager init failed: " + ex.Message);
-                Console.Error.WriteLine(ex.ToString());
-                throw;
+                try
+                {
+                    _graphics = new GraphicsDeviceManager(this);
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("ASMO: GraphicsDeviceManager init failed: " + ex.Message);
+                    Console.Error.WriteLine(ex.ToString());
+                    throw;
+                }
             }
             Content.RootDirectory = "Content";
             IsMouseVisible = true;
@@ -130,11 +143,14 @@ namespace AsmoV2
             //_graphics.PreferredBackBufferHeight = _bufferHeight * _scale;
 
             // set window size based on the requested width and height.
-            _graphics.PreferredBackBufferWidth = (int)(width * _scale);
-            _graphics.PreferredBackBufferHeight = (int)(height * _scale);
+            if (_graphics != null)
+            {
+                _graphics.PreferredBackBufferWidth = (int)(width * _scale);
+                _graphics.PreferredBackBufferHeight = (int)(height * _scale);
+            }
 
             // disable VSync so the GPU is not forced to sync to the display
-            _graphics.SynchronizeWithVerticalRetrace = true;
+            if (_graphics != null) _graphics.SynchronizeWithVerticalRetrace = true;
             // run Update/Draw as fast as possible (uncap FPS)
             IsFixedTimeStep = false;
             if (!string.IsNullOrEmpty(name))
@@ -146,7 +162,7 @@ namespace AsmoV2
                 _runtime = new IRRuntime("module test version 1.0.0");
             _runtime.EnableReflectionNativeMethods = true;
 
-            _graphics.ApplyChanges();
+            if (_graphics != null) _graphics.ApplyChanges();
 
             // Default policy: allow resizing and Alt+Enter toggle
             _windowPolicy = new WindowPolicy
@@ -211,6 +227,7 @@ namespace AsmoV2
             // avoid tiny fluctuations causing reentrant ApplyChanges
             if (Math.Abs(scale - _scale) <= ScaleEpsilon) return;
             _scale = scale;
+            if (_graphics == null) return;
             _graphics.PreferredBackBufferWidth = (int)(_bufferWidth * _scale);
             _graphics.PreferredBackBufferHeight = (int)(_bufferHeight * _scale);
             try
@@ -230,22 +247,25 @@ namespace AsmoV2
             {
                 Window.AllowUserResizing = _windowPolicy.AllowUserResizing && !_windowPolicy.LockSize;
 
-                if (_windowPolicy.SizeToDisplay)
+                if (_graphics != null)
                 {
-                    var d = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode;
-                    _graphics.PreferredBackBufferWidth = d.Width;
-                    _graphics.PreferredBackBufferHeight = d.Height;
-                    _graphics.ApplyChanges();
-                    _scale = Math.Max(0.1f, Math.Min((float)d.Width / Math.Max(1, _bufferWidth), (float)d.Height / Math.Max(1, _bufferHeight)));
-                }
+                    if (_windowPolicy.SizeToDisplay)
+                    {
+                        var d = GraphicsAdapter.DefaultAdapter.CurrentDisplayMode;
+                        _graphics.PreferredBackBufferWidth = d.Width;
+                        _graphics.PreferredBackBufferHeight = d.Height;
+                        _graphics.ApplyChanges();
+                        _scale = Math.Max(0.1f, Math.Min((float)d.Width / Math.Max(1, _bufferWidth), (float)d.Height / Math.Max(1, _bufferHeight)));
+                    }
 
-                if (_windowPolicy.StartFullscreen)
-                {
-                    EnterFullScreen();
-                }
-                else
-                {
-                    ExitFullScreen();
+                    if (_windowPolicy.StartFullscreen)
+                    {
+                        EnterFullScreen();
+                    }
+                    else
+                    {
+                        ExitFullScreen();
+                    }
                 }
             }
             catch
@@ -256,6 +276,7 @@ namespace AsmoV2
 
         void EnterFullScreen()
         {
+            if (_graphics == null) return;
             if (!_graphics.IsFullScreen)
             {
                 _prevWindowedWidth = _graphics.PreferredBackBufferWidth;
@@ -268,6 +289,7 @@ namespace AsmoV2
 
         void ExitFullScreen()
         {
+            if (_graphics == null) return;
             if (_graphics.IsFullScreen)
             {
                 _graphics.IsFullScreen = false;
@@ -315,25 +337,34 @@ namespace AsmoV2
 
         protected override void LoadContent()
         {
-            _spriteBatch = new SpriteBatch(GraphicsDevice);
-
-            // load a SpriteFont (Content/DefaultFont.spritefont)
-            _font = Content.Load<SpriteFont>("DefaultFont");
-
-            // create the Texture2D that will hold the pixel buffer
-            _screenTexture = new Texture2D(GraphicsDevice, _bufferWidth, _bufferHeight, false, SurfaceFormat.Color);
-            _canvas = new Canvas(_bufferWidth, _bufferHeight);
-            _canvas.Clear(Color.Black);
-            // Ensure the texture reflects any immediate pixel changes
-            try
+            if (!_useSdl)
             {
-                var rect = new Rectangle(0, 0, _canvas.width, _canvas.height);
-                _screenTexture.SetData(0, rect, _canvas.PixelData, 0, _canvas.PixelData.Length);
+                _spriteBatch = new SpriteBatch(GraphicsDevice);
+
+                // load a SpriteFont (Content/DefaultFont.spritefont)
+                _font = Content.Load<SpriteFont>("DefaultFont");
+
+                // create the Texture2D that will hold the pixel buffer
+                _screenTexture = new Texture2D(GraphicsDevice, _bufferWidth, _bufferHeight, false, SurfaceFormat.Color);
+                _canvas = new Canvas(_bufferWidth, _bufferHeight);
+                _canvas.Clear(Color.Black);
+                // Ensure the texture reflects any immediate pixel changes
+                try
+                {
+                    var rect = new Rectangle(0, 0, _canvas.width, _canvas.height);
+                    _screenTexture.SetData(0, rect, _canvas.PixelData, 0, _canvas.PixelData.Length);
+                }
+                catch
+                {
+                    // Fallback to naive SetData when explicit rectangle fails
+                    _screenTexture.SetData(_canvas.PixelData);
+                }
             }
-            catch
+            else
             {
-                // Fallback to naive SetData when explicit rectangle fails
-                _screenTexture.SetData(_canvas.PixelData);
+                // SDL mode: still create the canvas that the runtime and native games draw into
+                _canvas = new Canvas(_bufferWidth, _bufferHeight);
+                _canvas.Clear(Color.Black);
             }
 
             // Initialize audio subsystem with the game's Content manager so audio assets can be loaded
@@ -348,13 +379,53 @@ namespace AsmoV2
                 // Run the IR now that the pixel buffer and texture are initialized
                 _runtime.Run();
             }
+
+            // If using SDL backend, create an adapter and surface for presenting. We postpone
+            // creation until here so we have a valid Canvas instance. Otherwise create a
+            // MonoGameRenderBackend that will upload the Canvas into a Texture2D.
+            if (_useSdl)
+            {
+                try
+                {
+                    _sdlSurface = new Surface(_canvas.width, _canvas.height);
+                    _sdlAdapter = new SDLAdapterRenderer(_sdlSurface, Window?.Title ?? "VBlank SDL");
+                    // Sync initial pixels
+                    // upload using the abstraction Rect list type
+                    _sdlAdapter.Upload(_canvas, new System.Collections.Generic.List<VBlank.Abstractions.Rect>());
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("ASMO: SDL adapter init failed: " + ex.Message);
+                    _sdlAdapter = null;
+                    _sdlSurface = null;
+                    _useSdl = false;
+                }
+            }
+            else
+            {
+                // MonoGame path: create a backend adapter that implements the shared abstraction
+                try
+                {
+                    var adapter = new AsmoV2.RenderBackendAdapter();
+                    adapter.Initialize(this, _canvas);
+                    _renderBackend = null; // engine-level field not used; adapter owned locally
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("ASMO: MonoGame backend init failed: " + ex.Message);
+                }
+            }
         }
 
         protected override void UnloadContent()
         {
             // Shutdown audio subsystem and release precomputed assets
             Subsystem.Shutdown();
-            
+            // Shutdown SDL adapter if present
+            try { _sdlAdapter?.Shutdown(); } catch { }
+            try { _sdlAdapter?.Dispose(); } catch { }
+            _sdlAdapter = null;
+            _sdlSurface = null;
             base.UnloadContent();
         }
 
@@ -450,51 +521,65 @@ namespace AsmoV2
                         long fullPixels = (long)_canvas.width * _canvas.height;
                         bool doFull = forceFull || (totalPixels > (fullPixels / 4));
 
-                        if (doFull)
+                        // Upload via the active render backend if present.
+                        if (_renderBackend != null)
                         {
-                            int len = _canvas.width * _canvas.height;
-                            Color[] full = pool.Rent(len);
-                            try
+                            // Convert from MonoGame Rectangle to the shared abstraction Rect
+                            var rects = new System.Collections.Generic.List<VBlank.Abstractions.Rect>();
+                            foreach (var r in regions)
                             {
-                                Array.Copy(_canvas.PixelData, 0, full, 0, len);
-                                try
-                                {
-                                    var rect = new Rectangle(0, 0, _canvas.width, _canvas.height);
-                                    _screenTexture.SetData(0, rect, full, 0, len);
-                                }
-                                catch
-                                {
-                                    _screenTexture.SetData(full);
-                                }
+                                rects.Add(new VBlank.Abstractions.Rect { X = r.X, Y = r.Y, W = r.Width, H = r.Height });
                             }
-                            finally
-                            {
-                                pool.Return(full);
-                            }
+                            try { _renderBackend.Upload(_canvas, rects); } catch { }
                         }
                         else
                         {
-                            foreach (var r in regions)
+                            if (doFull)
                             {
-                                int dx = Math.Max(0, r.X);
-                                int dy = Math.Max(0, r.Y);
-                                int dw = Math.Min(_canvas.width - dx, r.Width);
-                                int dh = Math.Min(_canvas.height - dy, r.Height);
-                                if (dw <= 0 || dh <= 0) continue;
-                                int len = dw * dh;
-                                Color[] regionData = pool.Rent(len);
+                                int len = _canvas.width * _canvas.height;
+                                Color[] full = pool.Rent(len);
                                 try
                                 {
-                                    for (int yy = 0; yy < dh; yy++)
+                                    Array.Copy(_canvas.PixelData, 0, full, 0, len);
+                                    try
                                     {
-                                        Array.Copy(_canvas.PixelData, (dy + yy) * _canvas.width + dx, regionData, yy * dw, dw);
+                                        var rect = new Rectangle(0, 0, _canvas.width, _canvas.height);
+                                        _screenTexture.SetData(0, rect, full, 0, len);
                                     }
-                                    var region = new Rectangle(dx, dy, dw, dh);
-                                    _screenTexture.SetData(0, region, regionData, 0, len);
+                                    catch
+                                    {
+                                        _screenTexture.SetData(full);
+                                    }
                                 }
                                 finally
                                 {
-                                    pool.Return(regionData);
+                                    pool.Return(full);
+                                }
+                            }
+                            else
+                            {
+                                foreach (var r in regions)
+                                {
+                                    int dx = Math.Max(0, r.X);
+                                    int dy = Math.Max(0, r.Y);
+                                    int dw = Math.Min(_canvas.width - dx, r.Width);
+                                    int dh = Math.Min(_canvas.height - dy, r.Height);
+                                    if (dw <= 0 || dh <= 0) continue;
+                                    int len = dw * dh;
+                                    Color[] regionData = pool.Rent(len);
+                                    try
+                                    {
+                                        for (int yy = 0; yy < dh; yy++)
+                                        {
+                                            Array.Copy(_canvas.PixelData, (dy + yy) * _canvas.width + dx, regionData, yy * dw, dw);
+                                        }
+                                        var region = new Rectangle(dx, dy, dw, dh);
+                                        _screenTexture.SetData(0, region, regionData, 0, len);
+                                    }
+                                    finally
+                                    {
+                                        pool.Return(regionData);
+                                    }
                                 }
                             }
                         }
@@ -518,33 +603,45 @@ namespace AsmoV2
 
         protected override void Draw(GameTime gameTime)
         {
-            GraphicsDevice.Clear(Color.Black);
-
-            // update fps counter based on actual draws (value updated in Update via FpsCounter)
-
-            // Native game already draws during Update to ensure uploads include UI changes
-
-            // Draw the pixel buffer scaled to the window using point sampling
-            _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
-            _spriteBatch.Draw(
-                _screenTexture,
-                new Rectangle(0, 0, (int)(_bufferWidth * _scale), (int)(_bufferHeight * _scale)),
-                Color.White
-            );
-            _spriteBatch.End();
-
-            // Draw FPS and console overlay using a regular sprite batch (no point sampling required)
-            _spriteBatch.Begin();
-            _spriteBatch.DrawString(_font, $"FPS: {_fpsDisplay:F1}", new Vector2(4, 4), Color.White);
-
-            lock (_consoleTexts)
+            // If a render backend is present, let it present the canvas. Otherwise fall back to
+            // the previous MonoGame drawing code which uses the engine's SpriteBatch/Texture.
+            if (_renderBackend != null)
             {
-                foreach (var t in _consoleTexts)
+                try
                 {
-                    _spriteBatch.DrawString(_font, t.text, new Vector2(t.x, t.y), t.color);
+                    _renderBackend.Present();
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("ASMO: backend present failed: " + ex.Message);
                 }
             }
-            _spriteBatch.End();
+            else
+            {
+                GraphicsDevice.Clear(Color.Black);
+
+                // Draw the pixel buffer scaled to the window using point sampling
+                _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
+                _spriteBatch.Draw(
+                    _screenTexture,
+                    new Rectangle(0, 0, (int)(_bufferWidth * _scale), (int)(_bufferHeight * _scale)),
+                    Color.White
+                );
+                _spriteBatch.End();
+
+                // Draw FPS and console overlay using a regular sprite batch (no point sampling required)
+                _spriteBatch.Begin();
+                _spriteBatch.DrawString(_font, $"FPS: {_fpsDisplay:F1}", new Vector2(4, 4), Color.White);
+
+                lock (_consoleTexts)
+                {
+                    foreach (var t in _consoleTexts)
+                    {
+                        _spriteBatch.DrawString(_font, t.text, new Vector2(t.x, t.y), t.color);
+                    }
+                }
+                _spriteBatch.End();
+            }
 
             base.Draw(gameTime);
         }
