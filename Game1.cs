@@ -199,8 +199,21 @@ namespace AsmoV2
             var exeDir = AppDomain.CurrentDomain.BaseDirectory;
             var rootPath = System.IO.Path.Combine(exeDir, "root");
             vfs.Mount("/", new Adamantite.VFS.PhysicalFileSystem(rootPath));
-            // Also mount an in-memory fs at /mem for testing
-            vfs.Mount("/mem", new Adamantite.VFS.InMemoryFileSystem());
+            // Also mount an in-memory fs at /mem for testing and map /bin to it
+            var memFs = new Adamantite.VFS.InMemoryFileSystem();
+            vfs.Mount("/mem", memFs);
+            vfs.Mount("/bin", memFs);
+
+            // Ensure /mem/bin exists and provide a minimal /bin/sh stub
+            try
+            {
+                vfs.CreateDirectory("/mem/bin");
+                var shBytes = System.Text.Encoding.UTF8.GetBytes("#!/bin/sh\n# minimal sh stub\necho \"StarChart sh stub\"\n");
+                vfs.WriteAllBytes("/mem/bin/sh", shBytes);
+                // Create a symlink /bin/sh -> /mem/bin/sh
+                memFs.CreateSymlink("sh", "/mem/bin/sh");
+            }
+            catch { }
             // expose VFS on runtime (optional) - keep a static instance for now
             Adamantite.VFS.VFSGlobal.Manager = vfs;
         }
@@ -463,13 +476,16 @@ namespace AsmoV2
                 // Update and immediately draw the native game into the canvas so
                 // subsequent texture uploads in Update include the latest frame.
                 _nativeGame.Update(gameTime.ElapsedGameTime.TotalSeconds);
-                try
+                if (!(_nativeGame is IConsoleGameWithSpriteBatch))
                 {
-                    _nativeGame.Draw(_canvas);
-                }
-                catch
-                {
-                    // drawing should not crash the engine loop
+                    try
+                    {
+                        _nativeGame.Draw(_canvas);
+                    }
+                    catch
+                    {
+                        // drawing should not crash the engine loop
+                    }
                 }
             }
 
@@ -603,6 +619,27 @@ namespace AsmoV2
 
         protected override void Draw(GameTime gameTime)
         {
+            // If the native game supports SpriteBatch drawing, use it instead of Canvas rendering
+            if (_nativeGame is IConsoleGameWithSpriteBatch sbGame)
+            {
+                GraphicsDevice.Clear(Color.Black);
+                _spriteBatch.Begin();
+                sbGame.Draw(_spriteBatch, _font, _scale);
+                // Draw FPS and console overlay
+                _spriteBatch.DrawString(_font, $"FPS: {_fpsDisplay:F1}", new Vector2(4, 4), Color.White);
+
+                lock (_consoleTexts)
+                {
+                    foreach (var t in _consoleTexts)
+                    {
+                        _spriteBatch.DrawString(_font, t.text, new Vector2(t.x, t.y), t.color);
+                    }
+                }
+                _spriteBatch.End();
+                base.Draw(gameTime);
+                return;
+            }
+
             // If a render backend is present, let it present the canvas. Otherwise fall back to
             // the previous MonoGame drawing code which uses the engine's SpriteBatch/Texture.
             if (_renderBackend != null)
