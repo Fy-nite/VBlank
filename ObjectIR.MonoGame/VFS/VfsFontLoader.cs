@@ -19,7 +19,7 @@ namespace Adamantite.VFS
         /// <param name="vfs">The VFS manager or instance.</param>
         /// <param name="fontPath">The VFS path to the font file (e.g., .ttf, .otf).</param>
         /// <returns>A font object usable by the rendering system, or null if failed.</returns>
-        public static object LoadFont(IVfsManager vfs, string fontPath)
+        public static object LoadFont(VfsManager vfs, string fontPath)
         {
             if (!vfs.FileExists(fontPath))
                 throw new FileNotFoundException($"Font not found in VFS: {fontPath}");

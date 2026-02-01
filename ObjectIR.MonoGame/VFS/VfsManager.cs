@@ -116,5 +116,12 @@ namespace Adamantite.VFS
             if (fs == null) throw new FileNotFoundException(path);
             fs.WriteAllBytes(local, data);
         }
+
+        public bool FileExists(string fontPath)
+        {
+            var (fs, local) = Resolve(fontPath);
+            if (fs == null) return false;
+            return fs.Exists(local);
+        }
     }
 }
