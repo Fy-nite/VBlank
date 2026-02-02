@@ -62,7 +62,7 @@ namespace AsmoV2
             }
             else if (_mgImpl != null)
             {
-                // No-op: MonoGame backend expects the engine to draw using its own SpriteBatch.
+                try { _mgImpl.Present(); } catch { }
             }
         }
 
