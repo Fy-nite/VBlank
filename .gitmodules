@@ -16,6 +16,3 @@
 [submodule "Adamantite"]
 	path = Adamantite
 	url = https://github.com/Fy-nite/Adamantite
-[submodule "StarChart-Software"]
-	path = StarChart-Software
-	url = https://github.com/fy-nite/StarChart-Software
