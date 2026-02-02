@@ -8,4 +8,5 @@
   <Project Path="VBlank.Abstractions/VBlank.Abstractions.csproj" Id="65654459-2b35-4163-b405-16427403070e" />
   <Project Path="VBlank.csproj" />
   <Project Path="starchart/CraSH/CraSH.csproj" Id="b1f3e2a1-3c4d-4f5e-9d2a-8f7e2c6d9e4b" />
+
 </Solution>
