@@ -4,9 +4,9 @@
 [submodule "lantanite"]
 	path = lantanite
 	url = https://github.com/fy-nite/lantanite
-[submodule "starchart"]
-	path = starchart
-	url = https://github.com/fy-nite/starchart
+[submodule "StarChart"]
+	path = StarChart
+	url = https://github.com/fy-nite/StarChart
 [submodule "Chippy"]
 	path = Chippy
 	url = https://github.com/fy-nite/Chippy
