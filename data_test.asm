@@ -12,7 +12,7 @@
     mov rax, 60
     mov rdi, 0
     syscall
-
+section .text
 hello_msg:
     db "Hello form asm"
 

@@ -424,18 +424,37 @@ namespace AsmoV2
             }
             else
             {
-                // MonoGame path: create a backend adapter that implements the shared abstraction
+                // MonoGame path: by default create a backend adapter that implements the shared abstraction.
+                // You can disable this adapter at runtime by setting environment variable
+                // ASMO_DISABLE_RENDERBACKEND=1 which will force the engine to use its internal
+                // SetData upload path instead (useful for debugging upload/presentation issues).
+                bool disableAdapter = false;
                 try
                 {
-                    var adapter = new AsmoV2.RenderBackendAdapter();
-                    adapter.Initialize(this, _canvas);
-                    // Use the adapter as the engine-level render backend so the
-                    // Adamantite MonoGame backend can present directly.
-                    _renderBackend = adapter;
+                    var dv = Environment.GetEnvironmentVariable("ASMO_DISABLE_RENDERBACKEND");
+                    if (!string.IsNullOrEmpty(dv) && (dv == "1" || dv.Equals("true", StringComparison.OrdinalIgnoreCase))) disableAdapter = true;
                 }
-                catch (Exception ex)
+                catch { }
+
+                if (disableAdapter)
                 {
-                    Console.Error.WriteLine("ASMO: MonoGame backend init failed: " + ex.Message);
+                    Console.Error.WriteLine("ASMO: render backend adapter disabled via ASMO_DISABLE_RENDERBACKEND");
+                    _renderBackend = null;
+                }
+                else
+                {
+                    try
+                    {
+                        var adapter = new AsmoV2.RenderBackendAdapter();
+                        adapter.Initialize(this, _canvas);
+                        // Use the adapter as the engine-level render backend so the
+                        // Adamantite MonoGame backend can present directly.
+                        _renderBackend = adapter;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.Error.WriteLine("ASMO: MonoGame backend init failed: " + ex.Message);
+                    }
                 }
             }
 
@@ -491,11 +510,8 @@ namespace AsmoV2
                 _nativeGame.Update(gameTime.ElapsedGameTime.TotalSeconds);
                 try
                 {
-                    // Always invoke Draw(Canvas) on the native game. Some native games
-                    // implement IConsoleGameWithSpriteBatch and also provide a Canvas
-                    // draw implementation (e.g. Runtime). Calling Draw here ensures the
-                    // canvas pixels are updated and _canvas.IsDirty is set so texture
-                    // upload work is enqueued.
+                    // Always invoke Draw(Canvas) on the native game to update the canvas
+                    // pixels and set _canvas.IsDirty so texture upload work is enqueued.
                     _nativeGame.Draw(_canvas);
                 }
                 catch
@@ -570,21 +586,7 @@ namespace AsmoV2
                                 int len = _canvas.width * _canvas.height;
                                 Color[] full = pool.Rent(len);
                                 Array.Copy(_canvas.PixelData, 0, full, 0, len);
-                                try
-                                {
-                                    // sample first/mid/last for logging
-                                    if (len > 0)
-                                    {
-                                        var fcol = full[0];
-                                        var mcol = full[len / 2];
-                                        var lcol = full[len - 1];
-                                        uint fv = ((uint)fcol.A << 24) | ((uint)fcol.R << 16) | ((uint)fcol.G << 8) | fcol.B;
-                                        uint mv = ((uint)mcol.A << 24) | ((uint)mcol.R << 16) | ((uint)mcol.G << 8) | mcol.B;
-                                        uint lv = ((uint)lcol.A << 24) | ((uint)lcol.R << 16) | ((uint)lcol.G << 8) | lcol.B;
-                                        Console.Error.WriteLine($"ASMO: Enqueue FULL upload len={len} first=0x{fv:X8} mid=0x{mv:X8} last=0x{lv:X8}");
-                                    }
-                                }
-                                catch { }
+                                
                                 // Enqueue a task that will call SetData on the render thread and return the array to pool
                                 int localLenFull = len;
                                 _renderQueue.Enqueue(() =>
@@ -614,6 +616,46 @@ namespace AsmoV2
                                                     }
                                                     catch { }
                                                     _screenTexture.SetData(0, rect, full, 0, localLenFull);
+                                                    try
+                                                    {
+                                                        var probesTex = new Color[3];
+                                                        try
+                                                        {
+                                                            _screenTexture.GetData(0, new Rectangle(0, 0, 1, 1), probesTex, 0, 1);
+                                                            _screenTexture.GetData(0, new Rectangle(_canvas.width / 2, _canvas.height / 2, 1, 1), probesTex, 1, 1);
+                                                            _screenTexture.GetData(0, new Rectangle(Math.Max(0, _canvas.width - 1), Math.Max(0, _canvas.height - 1), 1, 1), probesTex, 2, 1);
+                                                            uint pv0 = ((uint)probesTex[0].A << 24) | ((uint)probesTex[0].R << 16) | ((uint)probesTex[0].G << 8) | probesTex[0].B;
+                                                            uint pv1 = ((uint)probesTex[1].A << 24) | ((uint)probesTex[1].R << 16) | ((uint)probesTex[1].G << 8) | probesTex[1].B;
+                                                            uint pv2 = ((uint)probesTex[2].A << 24) | ((uint)probesTex[2].R << 16) | ((uint)probesTex[2].G << 8) | probesTex[2].B;
+                                                            Console.Error.WriteLine($"ASMO: post-SetData FULL texture-probes top-left=0x{pv0:X8} center=0x{pv1:X8} bottom-right=0x{pv2:X8}");
+                                                        }
+                                                        catch { }
+
+                                                        try
+                                                        {
+                                                            uint srcChk = 0;
+                                                            for (int i = 0; i < localLenFull; i++)
+                                                            {
+                                                                var c = full[i];
+                                                                uint v = ((uint)c.A << 24) | ((uint)c.R << 16) | ((uint)c.G << 8) | c.B;
+                                                                srcChk ^= v;
+                                                            }
+
+                                                            var readback = new Color[localLenFull];
+                                                            try { _screenTexture.GetData(0, rect, readback, 0, localLenFull); } catch { }
+
+                                                            uint rbChk = 0;
+                                                            for (int i = 0; i < localLenFull && i < readback.Length; i++)
+                                                            {
+                                                                var c = readback[i];
+                                                                uint v = ((uint)c.A << 24) | ((uint)c.R << 16) | ((uint)c.G << 8) | c.B;
+                                                                rbChk ^= v;
+                                                            }
+                                                            Console.Error.WriteLine($"ASMO: FULL upload checksum src=0x{srcChk:X8} tex=0x{rbChk:X8}");
+                                                        }
+                                                        catch { }
+                                                    }
+                                                    catch { }
                                                 }
                                                 catch
                                                 {
@@ -629,6 +671,45 @@ namespace AsmoV2
                                                         }
                                                         catch { }
                                                         _screenTexture.SetData(full);
+                                                        try
+                                                        {
+                                                            var probesTexFb = new Color[3];
+                                                            try
+                                                            {
+                                                                _screenTexture.GetData(0, new Rectangle(0, 0, 1, 1), probesTexFb, 0, 1);
+                                                                _screenTexture.GetData(0, new Rectangle(_canvas.width / 2, _canvas.height / 2, 1, 1), probesTexFb, 1, 1);
+                                                                _screenTexture.GetData(0, new Rectangle(Math.Max(0, _canvas.width - 1), Math.Max(0, _canvas.height - 1), 1, 1), probesTexFb, 2, 1);
+                                                                uint pv0fb = ((uint)probesTexFb[0].A << 24) | ((uint)probesTexFb[0].R << 16) | ((uint)probesTexFb[0].G << 8) | probesTexFb[0].B;
+                                                                uint pv1fb = ((uint)probesTexFb[1].A << 24) | ((uint)probesTexFb[1].R << 16) | ((uint)probesTexFb[1].G << 8) | probesTexFb[1].B;
+                                                                uint pv2fb = ((uint)probesTexFb[2].A << 24) | ((uint)probesTexFb[2].R << 16) | ((uint)probesTexFb[2].G << 8) | probesTexFb[2].B;
+                                                                Console.Error.WriteLine($"ASMO: post-SetData FULL fallback texture-probes top-left=0x{pv0fb:X8} center=0x{pv1fb:X8} bottom-right=0x{pv2fb:X8}");
+                                                            }
+                                                            catch { }
+
+                                                            try
+                                                            {
+                                                                uint srcChkFb = 0;
+                                                                for (int i = 0; i < localLenFull; i++)
+                                                                {
+                                                                    var c = full[i];
+                                                                    uint v = ((uint)c.A << 24) | ((uint)c.R << 16) | ((uint)c.G << 8) | c.B;
+                                                                    srcChkFb ^= v;
+                                                                }
+
+                                                                var readbackFb = new Color[localLenFull];
+                                                                try { _screenTexture.GetData(readbackFb); } catch { }
+                                                                uint rbChkFb = 0;
+                                                                for (int i = 0; i < readbackFb.Length; i++)
+                                                                {
+                                                                    var c = readbackFb[i];
+                                                                    uint v = ((uint)c.A << 24) | ((uint)c.R << 16) | ((uint)c.G << 8) | c.B;
+                                                                    rbChkFb ^= v;
+                                                                }
+                                                                Console.Error.WriteLine($"ASMO: FULL fallback checksum src=0x{srcChkFb:X8} tex=0x{rbChkFb:X8}");
+                                                            }
+                                                            catch { }
+                                                        }
+                                                        catch { }
                                                 }
                                             }
                                         }
@@ -699,6 +780,45 @@ namespace AsmoV2
                                                         }
                                                         catch { }
                                                         _screenTexture.SetData(0, localRegion, localData, 0, localLen);
+                                                        try
+                                                        {
+                                                            var probesTexReg = new Color[3];
+                                                            try
+                                                            {
+                                                                _screenTexture.GetData(0, new Rectangle(localRegion.X, localRegion.Y, 1, 1), probesTexReg, 0, 1);
+                                                                _screenTexture.GetData(0, new Rectangle(localRegion.X + Math.Max(0, localRegion.Width / 2), localRegion.Y + Math.Max(0, localRegion.Height / 2), 1, 1), probesTexReg, 1, 1);
+                                                                _screenTexture.GetData(0, new Rectangle(Math.Min(_canvas.width - 1, localRegion.X + localRegion.Width - 1), Math.Min(_canvas.height - 1, localRegion.Y + localRegion.Height - 1), 1, 1), probesTexReg, 2, 1);
+                                                                uint prv0 = ((uint)probesTexReg[0].A << 24) | ((uint)probesTexReg[0].R << 16) | ((uint)probesTexReg[0].G << 8) | probesTexReg[0].B;
+                                                                uint prv1 = ((uint)probesTexReg[1].A << 24) | ((uint)probesTexReg[1].R << 16) | ((uint)probesTexReg[1].G << 8) | probesTexReg[1].B;
+                                                                uint prv2 = ((uint)probesTexReg[2].A << 24) | ((uint)probesTexReg[2].R << 16) | ((uint)probesTexReg[2].G << 8) | probesTexReg[2].B;
+                                                                Console.Error.WriteLine($"ASMO: post-SetData REGION texture-probes rect={localRegion} vals=0x{prv0:X8},0x{prv1:X8},0x{prv2:X8}");
+                                                            }
+                                                            catch { }
+
+                                                            try
+                                                            {
+                                                                uint srcChkR = 0;
+                                                                for (int i = 0; i < localLen; i++)
+                                                                {
+                                                                    var c = localData[i];
+                                                                    uint v = ((uint)c.A << 24) | ((uint)c.R << 16) | ((uint)c.G << 8) | c.B;
+                                                                    srcChkR ^= v;
+                                                                }
+
+                                                                var readbackR = new Color[localLen];
+                                                                try { _screenTexture.GetData(0, localRegion, readbackR, 0, localLen); } catch { }
+                                                                uint rbChkR = 0;
+                                                                for (int i = 0; i < localLen && i < readbackR.Length; i++)
+                                                                {
+                                                                    var c = readbackR[i];
+                                                                    uint v = ((uint)c.A << 24) | ((uint)c.R << 16) | ((uint)c.G << 8) | c.B;
+                                                                    rbChkR ^= v;
+                                                                }
+                                                                Console.Error.WriteLine($"ASMO: REGION upload checksum rect={localRegion} src=0x{srcChkR:X8} tex=0x{rbChkR:X8}");
+                                                            }
+                                                            catch { }
+                                                        }
+                                                        catch { }
                                                     }
                                                     catch
                                                     {
@@ -713,6 +833,18 @@ namespace AsmoV2
                                                         }
                                                         catch { }
                                                         try { _screenTexture.SetData(localData); } catch { }
+                                                        try
+                                                        {
+                                                            var probesTexRegFb = new Color[1];
+                                                            try
+                                                            {
+                                                                _screenTexture.GetData(probesTexRegFb);
+                                                                uint pv = ((uint)probesTexRegFb[0].A << 24) | ((uint)probesTexRegFb[0].R << 16) | ((uint)probesTexRegFb[0].G << 8) | probesTexRegFb[0].B;
+                                                                Console.Error.WriteLine($"ASMO: post-SetData REGION fallback texture-probe first=0x{pv:X8}");
+                                                            }
+                                                            catch { }
+                                                        }
+                                                        catch { }
                                                     }
                                                 }
                                             }
@@ -746,38 +878,16 @@ namespace AsmoV2
         protected override void Draw(GameTime gameTime)
         {
             // Process all pending render queue actions on the main thread
-            Console.Error.WriteLine("ASMO: Draw - processing render queue actions");
             while (_renderQueue.TryDequeue(out var work))
             {
                 try
                 {
-                    Console.Error.WriteLine("ASMO: executing a render task on main thread");
                     work?.Invoke();
                 }
                 catch (Exception ex)
                 {
                     Console.Error.WriteLine("ASMO: main thread render task exception: " + ex.Message);
                 }
-            }
-            // If the native game supports SpriteBatch drawing, use it instead of Canvas rendering
-            if (_nativeGame is IConsoleGameWithSpriteBatch sbGame)
-            {
-                GraphicsDevice.Clear(Color.Black);
-                _spriteBatch.Begin();
-                sbGame.Draw(_spriteBatch, _font, _scale);
-                // Draw FPS and console overlay
-                _spriteBatch.DrawString(_font, $"FPS: {_fpsDisplay:F1}", new Vector2(4, 4), Color.White);
-
-                lock (_consoleTexts)
-                {
-                    foreach (var t in _consoleTexts)
-                    {
-                        _spriteBatch.DrawString(_font, t.text, new Vector2(t.x, t.y), t.color);
-                    }
-                }
-                _spriteBatch.End();
-                base.Draw(gameTime);
-                return;
             }
 
             // If a render backend is present, let it present the canvas. Otherwise fall back to
@@ -799,44 +909,21 @@ namespace AsmoV2
 
                 // Draw the pixel buffer scaled to the window using point sampling
                 _spriteBatch.Begin(samplerState: SamplerState.PointClamp);
-                Console.Error.WriteLine($"ASMO: Draw - about to draw _screenTexture size {_bufferWidth}x{_bufferHeight} scale={_scale}");
                 lock (_graphicsLock)
                 {
                     try
                     {
                         if (_screenTexture != null)
                         {
-                            // Probe a few pixels from the texture to validate GPU-side contents
-                            try
-                            {
-                                var probes = new Color[3];
-                                int cx = Math.Max(0, _bufferWidth / 2);
-                                int cy = Math.Max(0, _bufferHeight / 2);
-                                // top-left
-                                _screenTexture.GetData(0, new Rectangle(0, 0, 1, 1), probes, 0, 1);
-                                // center
-                                _screenTexture.GetData(0, new Rectangle(cx, cy, 1, 1), probes, 1, 1);
-                                // bottom-right
-                                _screenTexture.GetData(0, new Rectangle(Math.Max(0, _bufferWidth - 1), Math.Max(0, _bufferHeight - 1), 1, 1), probes, 2, 1);
-                                uint p0 = ((uint)probes[0].A << 24) | ((uint)probes[0].R << 16) | ((uint)probes[0].G << 8) | probes[0].B;
-                                uint p1 = ((uint)probes[1].A << 24) | ((uint)probes[1].R << 16) | ((uint)probes[1].G << 8) | probes[1].B;
-                                uint p2 = ((uint)probes[2].A << 24) | ((uint)probes[2].R << 16) | ((uint)probes[2].G << 8) | probes[2].B;
-                                Console.Error.WriteLine($"ASMO: _screenTexture probes top-left=0x{p0:X8} center=0x{p1:X8} bottom-right=0x{p2:X8}");
-                            }
-                            catch (Exception ex)
-                            {
-                                Console.Error.WriteLine("ASMO: _screenTexture GetData probe failed: " + ex.Message);
-                            }
+                            _spriteBatch.Draw(
+                                _screenTexture,
+                                new Rectangle(0, 0, (int)(_bufferWidth * _scale), (int)(_bufferHeight * _scale)),
+                                Color.White
+                            );
                         }
                     }
                     catch { }
-                    _spriteBatch.Draw(
-                        _screenTexture,
-                        new Rectangle(0, 0, (int)(_bufferWidth * _scale), (int)(_bufferHeight * _scale)),
-                        Color.White
-                    );
                 }
-                Console.Error.WriteLine("ASMO: Draw - finished drawing _screenTexture");
                 _spriteBatch.End();
 
                 // Draw FPS and console overlay using a regular sprite batch (no point sampling required)
