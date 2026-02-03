@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
-using StarChart.stdlib.W11;
+using StarChart.stdlib.W11.Windowing;
+using Adamantite.GPU;
 
-namespace Adamantite.GPU
+namespace StarChart.stdlib.W11
 {
     // Simple compositor that converts W11 Window canvases into Surfaces and
     // draws them into a target Surface in server window order (already sorted by layer).
@@ -29,7 +30,7 @@ namespace Adamantite.GPU
                 if (c == null) continue;
                 try
                 {
-                    Console.Error.WriteLine($"Compositor: window '{w.Title}' id={w.XID} mapped={w.IsMapped} dirty={c.IsDirty} size={c.Width}x{c.Height}");
+                    // Console.Error.WriteLine($"Compositor: window '{w.Title}' id={w.XID} mapped={w.IsMapped} dirty={c.IsDirty} size={c.Width}x{c.Height}");
                 }
                 catch { }
 
@@ -57,7 +58,7 @@ namespace Adamantite.GPU
                     if (string.Equals(w.Title, "grid-test", StringComparison.OrdinalIgnoreCase))
                     {
                         dx = 0; dy = 0; dw = c.Width; dh = c.Height;
-                        try { Console.Error.WriteLine($"Compositor: forcing full copy for window id={w.XID} title={w.Title}"); } catch { }
+                        // try { Console.Error.WriteLine($"Compositor: forcing full copy for window id={w.XID} title={w.Title}"); } catch { }
                     }
 
                     // Diagnostic: sample raw canvas bytes at first/mid/last positions so we can
@@ -77,7 +78,7 @@ namespace Adamantite.GPU
                                 byte f0 = buf[fs + 0]; byte f1 = buf[fs + 1]; byte f2 = buf[fs + 2]; byte f3 = buf[fs + 3];
                                 byte m0 = buf[ms + 0]; byte m1 = buf[ms + 1]; byte m2 = buf[ms + 2]; byte m3 = buf[ms + 3];
                                 byte l0 = buf[ls + 0]; byte l1 = buf[ls + 1]; byte l2 = buf[ls + 2]; byte l3 = buf[ls + 3];
-                                Console.Error.WriteLine($"Compositor: canvas-bytes id={w.XID} first=[{f0:X2},{f1:X2},{f2:X2},{f3:X2}] mid=[{m0:X2},{m1:X2},{m2:X2},{m3:X2}] last=[{l0:X2},{l1:X2},{l2:X2},{l3:X2}]");
+                                // Console.Error.WriteLine($"Compositor: canvas-bytes id={w.XID} first=[{f0:X2},{f1:X2},{f2:X2},{f3:X2}] mid=[{m0:X2},{m1:X2},{m2:X2},{m3:X2}] last=[{l0:X2},{l1:X2},{l2:X2},{l3:X2}]");
                             }
                         }
                     }
@@ -110,7 +111,7 @@ namespace Adamantite.GPU
                         uint sf = surf.Pixels[0];
                         uint sm = surf.Pixels[surf.Pixels.Length / 2];
                         uint sl = surf.Pixels[surf.Pixels.Length - 1];
-                        Console.Error.WriteLine($"Compositor: surf-sample id={w.XID} first=0x{sf:X8} mid=0x{sm:X8} last=0x{sl:X8}");
+                        // Console.Error.WriteLine($"Compositor: surf-sample id={w.XID} first=0x{sf:X8} mid=0x{sm:X8} last=0x{sl:X8}");
                     }
                 }
                 catch { }

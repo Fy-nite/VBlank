@@ -18,6 +18,6 @@ if (useSdl)
     try { Environment.SetEnvironmentVariable("ASMO_BACKEND", "SDL"); } catch { }
 }
 
-using var game = new AsmoV2.AsmoGameEngine("VBlankTest", 800, 600);
+using var game = new VBlank.AsmoGameEngine("VBlankTest", 800, 600);
 game.LoadEntry("Content\\entry.oir");
 game.Run();

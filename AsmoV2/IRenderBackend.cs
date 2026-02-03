@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using VBlank.Abstractions;
 
-namespace AsmoV2
+namespace VBlank
 {
     // Engine-facing IRenderBackend that forwards to the abstraction in the shared
     // VBlank.Abstractions project. The engine compiles against this interface so

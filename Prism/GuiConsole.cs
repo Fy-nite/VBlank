@@ -1,6 +1,6 @@
 using System;
 using StarChart.stdlib.Sys;
-using StarChart.stdlib.W11;
+using StarChart.stdlib.W11.Windowing;
 using Adamantite.GPU;
 
 namespace StarChart.stdlib.W11

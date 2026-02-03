@@ -6,7 +6,7 @@ using Adamantite.GFX;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 
-namespace AsmoV2
+namespace VBlank
 {
     // Adapter that implements the engine IRenderBackend by delegating to
     // concrete backends available in the Adamantite project. This keeps the

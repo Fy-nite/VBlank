@@ -208,7 +208,7 @@ namespace StarChart.stdlib.W11
                 // Create plugin context
                 var context = new PluginContext
                 {
-                    DisplayServer = server,
+                    WindowingContext = server,
                     VFS = VFSGlobal.Manager,
                     Arguments = Array.Empty<string>(),
                     WorkingDirectory = "/"

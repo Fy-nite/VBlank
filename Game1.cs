@@ -11,7 +11,7 @@ using OCRuntime;
 using SharpIR;
 using System;
 using System.Diagnostics;
-using AsmoV2.AudioEngine;
+using VBlank.AudioEngine;
 using ObjectIR.MonoGame.SFX;
 using Adamantite.GFX;
 using Adamantite.GPU;
@@ -20,8 +20,10 @@ using System.Collections.Concurrent;
 using System.Threading;
 using System.IO;
 using static SharpIR.CSharpParser;
+using VBlank;
+using Adamantite.Util;
 
-namespace AsmoV2
+namespace VBlank
 {
     // Interface implemented by native games to receive an engine reference.
     public interface IEngineHost
@@ -108,7 +110,7 @@ namespace AsmoV2
         private SDLAdapterRenderer? _sdlAdapter;
         private Surface? _sdlSurface;
         private bool _useSdl = false;
-        // Engine-level render backend (adapter implementing AsmoV2.IRenderBackend)
+        // Engine-level render backend (adapter implementing VBlank.IRenderBackend)
         private IRenderBackend? _renderBackend;
 
         // Queue for batching texture uploads; processed on the main thread.
@@ -122,7 +124,7 @@ namespace AsmoV2
             var backend = DetectBackend();
             if (backend == BackendType.SilkSDL)
             {
-                Console.Error.WriteLine("ASMO: Using SilkSDL backend (ASMO_BACKEND=SDL)");
+                    DebugUtil.Debug("ASMO: Using SilkSDL backend (ASMO_BACKEND=SDL)");
                 _useSdl = true;
             }
             // Only initialize MonoGame GraphicsDeviceManager when not using SDL backend
@@ -134,7 +136,7 @@ namespace AsmoV2
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine("ASMO: GraphicsDeviceManager init failed: " + ex.Message);
+                    DebugUtil.Debug("ASMO: GraphicsDeviceManager init failed: " + ex.Message);
                     Console.Error.WriteLine(ex.ToString());
                     throw;
                 }
@@ -372,12 +374,12 @@ namespace AsmoV2
                 {
                     var rect = new Rectangle(0, 0, _canvas.width, _canvas.height);
                     _screenTexture.SetData(0, rect, _canvas.PixelData, 0, _canvas.PixelData.Length);
-                    Console.Error.WriteLine("ASMO: Initial Texture2D.SetData succeeded");
+                    DebugUtil.Debug("ASMO: Initial Texture2D.SetData succeeded");
                 }
                 catch
                 {
                     // Fallback to naive SetData when explicit rectangle fails
-                    Console.Error.WriteLine("ASMO: Texture2D.SetData with rectangle failed; falling back to full SetData");
+                    DebugUtil.Debug("ASMO: Texture2D.SetData with rectangle failed; falling back to full SetData");
                     _screenTexture.SetData(_canvas.PixelData);
                 }
             }
@@ -416,7 +418,7 @@ namespace AsmoV2
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine("ASMO: SDL adapter init failed: " + ex.Message);
+                    DebugUtil.Debug("ASMO: SDL adapter init failed: " + ex.Message);
                     _sdlAdapter = null;
                     _sdlSurface = null;
                     _useSdl = false;
@@ -438,14 +440,14 @@ namespace AsmoV2
 
                 if (disableAdapter)
                 {
-                    Console.Error.WriteLine("ASMO: render backend adapter disabled via ASMO_DISABLE_RENDERBACKEND");
+                    DebugUtil.Debug("ASMO: render backend adapter disabled via ASMO_DISABLE_RENDERBACKEND");
                     _renderBackend = null;
                 }
                 else
                 {
                     try
                     {
-                        var adapter = new AsmoV2.RenderBackendAdapter();
+                        var adapter = new VBlank.RenderBackendAdapter();
                         adapter.Initialize(this, _canvas);
                         // Use the adapter as the engine-level render backend so the
                         // Adamantite MonoGame backend can present directly.
@@ -453,7 +455,7 @@ namespace AsmoV2
                     }
                     catch (Exception ex)
                     {
-                        Console.Error.WriteLine("ASMO: MonoGame backend init failed: " + ex.Message);
+                        DebugUtil.Debug("ASMO: MonoGame backend init failed: " + ex.Message);
                     }
                 }
             }
@@ -611,7 +613,7 @@ namespace AsmoV2
                                                             uint fv = ((uint)fcol.A << 24) | ((uint)fcol.R << 16) | ((uint)fcol.G << 8) | fcol.B;
                                                             uint mv = ((uint)mcol.A << 24) | ((uint)mcol.R << 16) | ((uint)mcol.G << 8) | mcol.B;
                                                             uint lv = ((uint)lcol.A << 24) | ((uint)lcol.R << 16) | ((uint)lcol.G << 8) | lcol.B;
-                                                            Console.Error.WriteLine($"ASMO: SetData FULL rect={rect} len={localLenFull} first=0x{fv:X8} mid=0x{mv:X8} last=0x{lv:X8}");
+                                                            DebugUtil.Debug($"ASMO: SetData FULL rect={rect} len={localLenFull} first=0x{fv:X8} mid=0x{mv:X8} last=0x{lv:X8}");
                                                         }
                                                     }
                                                     catch { }
@@ -627,7 +629,7 @@ namespace AsmoV2
                                                             uint pv0 = ((uint)probesTex[0].A << 24) | ((uint)probesTex[0].R << 16) | ((uint)probesTex[0].G << 8) | probesTex[0].B;
                                                             uint pv1 = ((uint)probesTex[1].A << 24) | ((uint)probesTex[1].R << 16) | ((uint)probesTex[1].G << 8) | probesTex[1].B;
                                                             uint pv2 = ((uint)probesTex[2].A << 24) | ((uint)probesTex[2].R << 16) | ((uint)probesTex[2].G << 8) | probesTex[2].B;
-                                                            Console.Error.WriteLine($"ASMO: post-SetData FULL texture-probes top-left=0x{pv0:X8} center=0x{pv1:X8} bottom-right=0x{pv2:X8}");
+                                                            DebugUtil.Debug($"ASMO: post-SetData FULL texture-probes top-left=0x{pv0:X8} center=0x{pv1:X8} bottom-right=0x{pv2:X8}");
                                                         }
                                                         catch { }
 
@@ -651,7 +653,7 @@ namespace AsmoV2
                                                                 uint v = ((uint)c.A << 24) | ((uint)c.R << 16) | ((uint)c.G << 8) | c.B;
                                                                 rbChk ^= v;
                                                             }
-                                                            Console.Error.WriteLine($"ASMO: FULL upload checksum src=0x{srcChk:X8} tex=0x{rbChk:X8}");
+                                                            DebugUtil.Debug($"ASMO: FULL upload checksum src=0x{srcChk:X8} tex=0x{rbChk:X8}");
                                                         }
                                                         catch { }
                                                     }
@@ -666,7 +668,7 @@ namespace AsmoV2
                                                             {
                                                                 var fcol = full[0];
                                                                 uint fv = ((uint)fcol.A << 24) | ((uint)fcol.R << 16) | ((uint)fcol.G << 8) | fcol.B;
-                                                                Console.Error.WriteLine($"ASMO: SetData FULL fallback len={localLenFull} first=0x{fv:X8}");
+                                                                DebugUtil.Debug($"ASMO: SetData FULL fallback len={localLenFull} first=0x{fv:X8}");
                                                             }
                                                         }
                                                         catch { }
@@ -682,7 +684,7 @@ namespace AsmoV2
                                                                 uint pv0fb = ((uint)probesTexFb[0].A << 24) | ((uint)probesTexFb[0].R << 16) | ((uint)probesTexFb[0].G << 8) | probesTexFb[0].B;
                                                                 uint pv1fb = ((uint)probesTexFb[1].A << 24) | ((uint)probesTexFb[1].R << 16) | ((uint)probesTexFb[1].G << 8) | probesTexFb[1].B;
                                                                 uint pv2fb = ((uint)probesTexFb[2].A << 24) | ((uint)probesTexFb[2].R << 16) | ((uint)probesTexFb[2].G << 8) | probesTexFb[2].B;
-                                                                Console.Error.WriteLine($"ASMO: post-SetData FULL fallback texture-probes top-left=0x{pv0fb:X8} center=0x{pv1fb:X8} bottom-right=0x{pv2fb:X8}");
+                                                                DebugUtil.Debug($"ASMO: post-SetData FULL fallback texture-probes top-left=0x{pv0fb:X8} center=0x{pv1fb:X8} bottom-right=0x{pv2fb:X8}");
                                                             }
                                                             catch { }
 
@@ -705,7 +707,7 @@ namespace AsmoV2
                                                                     uint v = ((uint)c.A << 24) | ((uint)c.R << 16) | ((uint)c.G << 8) | c.B;
                                                                     rbChkFb ^= v;
                                                                 }
-                                                                Console.Error.WriteLine($"ASMO: FULL fallback checksum src=0x{srcChkFb:X8} tex=0x{rbChkFb:X8}");
+                                                                DebugUtil.Debug($"ASMO: FULL fallback checksum src=0x{srcChkFb:X8} tex=0x{rbChkFb:X8}");
                                                             }
                                                             catch { }
                                                         }
@@ -746,7 +748,7 @@ namespace AsmoV2
                                             uint fv = ((uint)fcol.A << 24) | ((uint)fcol.R << 16) | ((uint)fcol.G << 8) | fcol.B;
                                             uint mv = ((uint)mcol.A << 24) | ((uint)mcol.R << 16) | ((uint)mcol.G << 8) | mcol.B;
                                             uint lv = ((uint)lcol.A << 24) | ((uint)lcol.R << 16) | ((uint)lcol.G << 8) | lcol.B;
-                                            Console.Error.WriteLine($"ASMO: Enqueue REGION upload rect={dx},{dy},{dw},{dh} len={len} first=0x{fv:X8} mid=0x{mv:X8} last=0x{lv:X8}");
+                                            DebugUtil.Debug($"ASMO: Enqueue REGION upload rect={dx},{dy},{dw},{dh} len={len} first=0x{fv:X8} mid=0x{mv:X8} last=0x{lv:X8}");
                                         }
                                     }
                                     catch { }
@@ -775,7 +777,7 @@ namespace AsmoV2
                                                                 uint fv = ((uint)fcol.A << 24) | ((uint)fcol.R << 16) | ((uint)fcol.G << 8) | fcol.B;
                                                                 uint mv = ((uint)mcol.A << 24) | ((uint)mcol.R << 16) | ((uint)mcol.G << 8) | mcol.B;
                                                                 uint lv = ((uint)lcol.A << 24) | ((uint)lcol.R << 16) | ((uint)lcol.G << 8) | lcol.B;
-                                                                Console.Error.WriteLine($"ASMO: SetData REGION rect={localRegion} len={localLen} first=0x{fv:X8} mid=0x{mv:X8} last=0x{lv:X8}");
+                                                                DebugUtil.Debug($"ASMO: SetData REGION rect={localRegion} len={localLen} first=0x{fv:X8} mid=0x{mv:X8} last=0x{lv:X8}");
                                                             }
                                                         }
                                                         catch { }
@@ -791,7 +793,7 @@ namespace AsmoV2
                                                                 uint prv0 = ((uint)probesTexReg[0].A << 24) | ((uint)probesTexReg[0].R << 16) | ((uint)probesTexReg[0].G << 8) | probesTexReg[0].B;
                                                                 uint prv1 = ((uint)probesTexReg[1].A << 24) | ((uint)probesTexReg[1].R << 16) | ((uint)probesTexReg[1].G << 8) | probesTexReg[1].B;
                                                                 uint prv2 = ((uint)probesTexReg[2].A << 24) | ((uint)probesTexReg[2].R << 16) | ((uint)probesTexReg[2].G << 8) | probesTexReg[2].B;
-                                                                Console.Error.WriteLine($"ASMO: post-SetData REGION texture-probes rect={localRegion} vals=0x{prv0:X8},0x{prv1:X8},0x{prv2:X8}");
+                                                                DebugUtil.Debug($"ASMO: post-SetData REGION texture-probes rect={localRegion} vals=0x{prv0:X8},0x{prv1:X8},0x{prv2:X8}");
                                                             }
                                                             catch { }
 
@@ -814,7 +816,7 @@ namespace AsmoV2
                                                                     uint v = ((uint)c.A << 24) | ((uint)c.R << 16) | ((uint)c.G << 8) | c.B;
                                                                     rbChkR ^= v;
                                                                 }
-                                                                Console.Error.WriteLine($"ASMO: REGION upload checksum rect={localRegion} src=0x{srcChkR:X8} tex=0x{rbChkR:X8}");
+                                                                DebugUtil.Debug($"ASMO: REGION upload checksum rect={localRegion} src=0x{srcChkR:X8} tex=0x{rbChkR:X8}");
                                                             }
                                                             catch { }
                                                         }
@@ -828,7 +830,7 @@ namespace AsmoV2
                                                             {
                                                                 var fcol = localData[0];
                                                                 uint fv = ((uint)fcol.A << 24) | ((uint)fcol.R << 16) | ((uint)fcol.G << 8) | fcol.B;
-                                                                Console.Error.WriteLine($"ASMO: SetData REGION fallback len={localLen} first=0x{fv:X8}");
+                                                                DebugUtil.Debug($"ASMO: SetData REGION fallback len={localLen} first=0x{fv:X8}");
                                                             }
                                                         }
                                                         catch { }
@@ -840,7 +842,7 @@ namespace AsmoV2
                                                             {
                                                                 _screenTexture.GetData(probesTexRegFb);
                                                                 uint pv = ((uint)probesTexRegFb[0].A << 24) | ((uint)probesTexRegFb[0].R << 16) | ((uint)probesTexRegFb[0].G << 8) | probesTexRegFb[0].B;
-                                                                Console.Error.WriteLine($"ASMO: post-SetData REGION fallback texture-probe first=0x{pv:X8}");
+                                                                DebugUtil.Debug($"ASMO: post-SetData REGION fallback texture-probe first=0x{pv:X8}");
                                                             }
                                                             catch { }
                                                         }
@@ -864,7 +866,7 @@ namespace AsmoV2
                         _canvas.ClearDirty();
                         if (swUpload.ElapsedMilliseconds > 10)
                         {
-                            Console.Error.WriteLine($"ASMO: texture upload took {swUpload.ElapsedMilliseconds}ms for {regions.Count} regions (totalPixels={totalPixels})");
+                            DebugUtil.Debug($"ASMO: texture upload took {swUpload.ElapsedMilliseconds}ms for {regions.Count} regions (totalPixels={totalPixels})");
                         }
                     }
                 }
@@ -886,7 +888,7 @@ namespace AsmoV2
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine("ASMO: main thread render task exception: " + ex.Message);
+                    DebugUtil.Debug("ASMO: main thread render task exception: " + ex.Message);
                 }
             }
 
@@ -900,7 +902,7 @@ namespace AsmoV2
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine("ASMO: backend present failed: " + ex.Message);
+                    DebugUtil.Debug("ASMO: backend present failed: " + ex.Message);
                 }
             }
             else

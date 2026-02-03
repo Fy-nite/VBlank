@@ -1,7 +1,7 @@
 ﻿using Microsoft.Xna.Framework.Content;
 using ObjectIR.MonoGame.Helpers;
 
-namespace AsmoV2.AudioEngine
+namespace VBlank.AudioEngine
 {
     /// <summary>
     /// Simple host for the ObjectIR audio helpers used by the main game.

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace StarChart.stdlib.W11
+namespace StarChart.stdlib.W11.Windowing
 {
     // The minimal W11 windowing API used by the runtime and TWM.
     public class WindowGeometry

@@ -19,6 +19,7 @@
     <Compile Remove="lantanite\**" />
     <Compile Remove="ObjectIR.MonoGame\**" />
     <Compile Remove="starchart\**" />
+    <Compile Remove="W11\**" />
     <EmbeddedResource Remove="Adamantite\Adamantite.CSharp\**" />
     <EmbeddedResource Remove="Chippy\**" />
     <EmbeddedResource Remove="Iridion-core\**" />
@@ -26,6 +27,7 @@
     <EmbeddedResource Remove="lantanite\**" />
     <EmbeddedResource Remove="ObjectIR.MonoGame\**" />
     <EmbeddedResource Remove="starchart\**" />
+    <EmbeddedResource Remove="W11\**" />
     <None Remove="Adamantite\Adamantite.CSharp\**" />
     <None Remove="Chippy\**" />
     <None Remove="Iridion-core\**" />
@@ -33,6 +35,7 @@
     <None Remove="lantanite\**" />
     <None Remove="ObjectIR.MonoGame\**" />
     <None Remove="starchart\**" />
+    <None Remove="W11\**" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="Content\Content.mgcb" />

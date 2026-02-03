@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using Adamantite.Util;
+using StarChart.Plugins;
+using StarChart.stdlib.W11.Windowing;
 
 namespace StarChart.stdlib.W11
 {
@@ -8,7 +11,7 @@ namespace StarChart.stdlib.W11
     // copying the client's canvas into the frame's canvas while drawing a
     // simple titlebar. This is only an example to show how a WM could
     // manage windows with the minimal DisplayServer API.
-    public class TwmManager : StarChart.Plugins.IStarChartWindowManager
+    public class TwmManager : IStarChartWindowManager
     {
         readonly DisplayServer _server;
         readonly int _titlebarHeight;
@@ -282,9 +285,14 @@ namespace StarChart.stdlib.W11
 
         public void HandleMouse(int x, int y, bool leftDown, bool leftPressed, bool leftReleased)
         {
+            bool debug = Environment.GetEnvironmentVariable("ASMO_DEBUG") == "1";
+            // Debug: log mouse events (temporary)
+            try { DebugUtil.Debug($"TWM: Mouse evt x={x} y={y} down={leftDown} pressed={leftPressed} released={leftReleased}"); } catch { }
+
             if (leftPressed)
             {
                 var hit = HitTestFrame(x, y);
+                try { DebugUtil.Debug($"TWM: HitTest frame={(hit.frame!=null?hit.frame.XID.ToString():"null")} client={(hit.client!=null?hit.client.XID.ToString():"null")} localX={hit.localX} localY={hit.localY}"); } catch { }
                 if (hit.frame != null && hit.client != null)
                 {
                     _server.BringToFront(hit.frame);
@@ -326,6 +334,7 @@ namespace StarChart.stdlib.W11
                         _dragFrame = hit.frame;
                         _dragOffsetX = x - hit.frame.Geometry.X;
                         _dragOffsetY = y - hit.frame.Geometry.Y;
+                        try { DebugUtil.Debug($"TWM: Start drag frame={hit.frame.XID} offsetX={_dragOffsetX} offsetY={_dragOffsetY}"); } catch { }
                     }
                 }
             }
@@ -334,6 +343,7 @@ namespace StarChart.stdlib.W11
             {
                 int newX = x - _dragOffsetX;
                 int newY = y - _dragOffsetY;
+                try { DebugUtil.Debug($"TWM: Dragging move to {newX},{newY} (client move calc)"); } catch { }
                 _server.MoveWindow(_dragFrame, newX, newY);
 
                 int clientY = newY + _titlebarHeight * _dragFrame.Scale;
@@ -387,6 +397,7 @@ namespace StarChart.stdlib.W11
 
             if (leftReleased)
             {
+                try { DebugUtil.Debug("TWM: Left released - stop dragging/resizing"); } catch { }
                 _dragging = false;
                 _dragClient = null;
                 _dragFrame = null;

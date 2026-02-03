@@ -1,12 +1,7 @@
 <Solution>
   <Project Path="Adamantite\Adamantite.CSharp\Adamantite.csproj" Id="22f20e9d-4f02-47ee-a5b9-1a89ff09083b" />
-  <Project Path="Chippy/Chippy.csproj" />
   <Project Path="Iridion-core/OCRuntime/OCRuntime.csproj" />
   <Project Path="Iridion-core/Runtimes/SharpIR/SharpIR.csproj" />
-  <Project Path="jakarada/src/Jakarada.Core/Jakarada.Core.csproj" />
-  <Project Path="StarChart/StarChart.csproj" />
   <Project Path="VBlank.Abstractions/VBlank.Abstractions.csproj" Id="65654459-2b35-4163-b405-16427403070e" />
   <Project Path="VBlank.csproj" />
-
-
 </Solution>

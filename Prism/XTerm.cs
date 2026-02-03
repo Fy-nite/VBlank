@@ -1,13 +1,16 @@
 using System;
 using System.Collections.Generic;
+using StarChart; // For IScheduledTask
 using StarChart.Plugins;
+using StarChart.stdlib.W11.Windowing;
 
 namespace StarChart.stdlib.W11
 {
     public class XTerm : IStarChartApp, IScheduledTask
     {
         // IStarChartApp implementation
-        public Window? MainWindow => Window;
+        public object? MainWindow => Window;
+        public DisplayServer Server => _server;
         public bool IsComplete => Window.IsDestroyed;
 
         public void Initialize(PluginContext context) { }

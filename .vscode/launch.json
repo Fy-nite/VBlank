@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
       {
-        "name": "C#: AsmoV2 Debug",
+        "name": "C#: VBlank Debug",
         "type": "dotnet",
         "request": "launch",
-        "projectPath": "${workspaceFolder}/AsmoV2.csproj"
+        "projectPath": "${workspaceFolder}/VBlank.csproj"
       }
     ],
   }
