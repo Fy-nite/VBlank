@@ -22,6 +22,7 @@ using System.IO;
 using static SharpIR.CSharpParser;
 using VBlank;
 using Adamantite.Util;
+using VBlank.Abstractions;
 
 namespace VBlank
 {
@@ -106,12 +107,9 @@ namespace VBlank
         public int BufferWidth => _bufferWidth;
         public int BufferHeight => _bufferHeight;
 
-        // SDL adapter (optional)
-        private SDLAdapterRenderer? _sdlAdapter;
+
         private Surface? _sdlSurface;
         private bool _useSdl = false;
-        // Engine-level render backend (adapter implementing VBlank.IRenderBackend)
-        private IRenderBackend? _renderBackend;
 
         // Queue for batching texture uploads; processed on the main thread.
         private readonly ConcurrentQueue<Action> _renderQueue = new ConcurrentQueue<Action>();
@@ -122,11 +120,12 @@ namespace VBlank
             // set name, width and height based on parameters
             // Detect backend; we still construct MonoGame GraphicsDeviceManager by default but log init failures.
             var backend = DetectBackend();
-            if (backend == BackendType.SilkSDL)
-            {
-                    DebugUtil.Debug("ASMO: Using SilkSDL backend (ASMO_BACKEND=SDL)");
-                _useSdl = true;
-            }
+            // Force MonoGame usage
+            // if (backend == BackendType.SilkSDL)
+            // {
+            //         DebugUtil.Debug("ASMO: Using SilkSDL backend (ASMO_BACKEND=SDL)");
+            //     _useSdl = true;
+            // }
             // Only initialize MonoGame GraphicsDeviceManager when not using SDL backend
             if (!_useSdl)
             {
@@ -406,59 +405,9 @@ namespace VBlank
             // If using SDL backend, create an adapter and surface for presenting. We postpone
             // creation until here so we have a valid Canvas instance. Otherwise create a
             // MonoGameRenderBackend that will upload the Canvas into a Texture2D.
-            if (_useSdl)
-            {
-                try
-                {
-                    _sdlSurface = new Surface(_canvas.width, _canvas.height);
-                    _sdlAdapter = new SDLAdapterRenderer(_sdlSurface, Window?.Title ?? "VBlank SDL");
-                    // Sync initial pixels
-                    // upload using the abstraction Rect list type
-                    _sdlAdapter.Upload(_canvas, new System.Collections.Generic.List<VBlank.Abstractions.Rect>());
-                }
-                catch (Exception ex)
-                {
-                    DebugUtil.Debug("ASMO: SDL adapter init failed: " + ex.Message);
-                    _sdlAdapter = null;
-                    _sdlSurface = null;
-                    _useSdl = false;
-                }
-            }
-            else
-            {
-                // MonoGame path: by default create a backend adapter that implements the shared abstraction.
-                // You can disable this adapter at runtime by setting environment variable
-                // ASMO_DISABLE_RENDERBACKEND=1 which will force the engine to use its internal
-                // SetData upload path instead (useful for debugging upload/presentation issues).
-                bool disableAdapter = false;
-                try
-                {
-                    var dv = Environment.GetEnvironmentVariable("ASMO_DISABLE_RENDERBACKEND");
-                    if (!string.IsNullOrEmpty(dv) && (dv == "1" || dv.Equals("true", StringComparison.OrdinalIgnoreCase))) disableAdapter = true;
-                }
-                catch { }
-
-                if (disableAdapter)
-                {
-                    DebugUtil.Debug("ASMO: render backend adapter disabled via ASMO_DISABLE_RENDERBACKEND");
-                    _renderBackend = null;
-                }
-                else
-                {
-                    try
-                    {
-                        var adapter = new VBlank.RenderBackendAdapter();
-                        adapter.Initialize(this, _canvas);
-                        // Use the adapter as the engine-level render backend so the
-                        // Adamantite MonoGame backend can present directly.
-                        _renderBackend = adapter;
-                    }
-                    catch (Exception ex)
-                    {
-                        DebugUtil.Debug("ASMO: MonoGame backend init failed: " + ex.Message);
-                    }
-                }
-            }
+           
+            // RenderBackendAdapter removal: forcing native MonoGame SetData/Draw path.
+            
 
             // No background render thread; uploads are processed on the main thread.
         }
@@ -468,9 +417,9 @@ namespace VBlank
             // Shutdown audio subsystem and release precomputed assets
             Subsystem.Shutdown();
             // Shutdown SDL adapter if present
-            try { _sdlAdapter?.Shutdown(); } catch { }
-            try { _sdlAdapter?.Dispose(); } catch { }
-            _sdlAdapter = null;
+            // try { _sdlAdapter?.Shutdown(); } catch { }
+            // try { _sdlAdapter?.Dispose(); } catch { }
+            // _sdlAdapter = null;
             _sdlSurface = null;
             // No background render thread to stop.
             base.UnloadContent();
@@ -570,18 +519,7 @@ namespace VBlank
                         long fullPixels = (long)_canvas.width * _canvas.height;
                         bool doFull = forceFull || (totalPixels > (fullPixels / 4));
 
-                        // Upload via the active render backend if present; otherwise enqueue
-                        // texture SetData operations to the render worker so Update() stays fast.
-                        if (_renderBackend != null)
-                        {
-                            var rects = new System.Collections.Generic.List<VBlank.Abstractions.Rect>();
-                            foreach (var r in regions)
-                            {
-                                rects.Add(new VBlank.Abstractions.Rect { X = r.X, Y = r.Y, W = r.Width, H = r.Height });
-                            }
-                            try { _renderBackend.Upload(_canvas, rects); } catch { }
-                        }
-                        else
+                        // Enqueue texture SetData operations to the render worker so Update() stays fast.
                         {
                             if (doFull)
                             {
@@ -892,20 +830,7 @@ namespace VBlank
                 }
             }
 
-            // If a render backend is present, let it present the canvas. Otherwise fall back to
-            // the previous MonoGame drawing code which uses the engine's SpriteBatch/Texture.
-            if (_renderBackend != null)
-            {
-                try
-                {
-                    _renderBackend.Present();
-                }
-                catch (Exception ex)
-                {
-                    DebugUtil.Debug("ASMO: backend present failed: " + ex.Message);
-                }
-            }
-            else
+            // Use the MonoGame drawing code which uses the engine's SpriteBatch/Texture.
             {
                 GraphicsDevice.Clear(Color.Black);
 
