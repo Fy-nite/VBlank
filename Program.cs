@@ -19,5 +19,5 @@ if (useSdl)
 }
 
 using var game = new VBlank.AsmoGameEngine("VBlankTest", 800, 600);
-game.LoadEntry("Content\\entry.oir");
+game.LoadEntry("Content/Main.OIR");
 game.Run();

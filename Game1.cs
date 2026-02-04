@@ -193,7 +193,7 @@ namespace VBlank
             }
 
             // register builtin runtime bindings (pixels, console, audio, etc.)
-            RegisterRuntimeBindings(_runtime);
+            _runtime = RegisterRuntimeBindings(_runtime);
 
             // Log unhandled exceptions to stderr to aid debugging on Linux/macOS
             AppDomain.CurrentDomain.UnhandledException += (s, e) =>
@@ -223,6 +223,7 @@ namespace VBlank
             catch { }
             // expose VFS on runtime (optional) - keep a static instance for now
             Adamantite.VFS.VFSGlobal.Manager = vfs;
+
         }
 
         /// <summary>
@@ -798,6 +799,7 @@ namespace VBlank
                             }
                         }
                     }
+                    
                     finally
                     {
                         swUpload.Stop();
@@ -865,9 +867,10 @@ namespace VBlank
                     }
                 }
                 _spriteBatch.End();
-            }
+            
 
             base.Draw(gameTime);
+        }
         }
 
         // Background render worker: executes queued texture upload actions.
@@ -942,7 +945,7 @@ namespace VBlank
             {
                 _runtime = new IRRuntime(text);
                 _runtime.EnableReflectionNativeMethods = true;
-                RegisterRuntimeBindings(_runtime);
+                _runtime = RegisterRuntimeBindings(_runtime);
                 _runtime.OnException += (ex) => Console.WriteLine("Runtime Exception: " + ex.ToString());
             }
             catch (Exception ex)
@@ -951,7 +954,7 @@ namespace VBlank
             }
         }
 
-        private void RegisterRuntimeBindings(IRRuntime runtime)
+        private IRRuntime RegisterRuntimeBindings(IRRuntime runtime)
         {
             // Pixel bindings
             runtime.RegisterNativeMethod("OCRuntime.PixelBindings.SetPixel(int64,int64,int64)", (i, args) =>
@@ -1086,6 +1089,7 @@ namespace VBlank
                 }
                 return null;
             });
+            return runtime;
         }
     }
 }
