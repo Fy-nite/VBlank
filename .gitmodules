@@ -1,13 +1,7 @@
-[submodule "Iridion-core"]
+[submodule "iridion-core"]
 	path = Iridion-core
 	url = https://git.finite.ovh/Iridion-core
 
 [submodule "Adamantite"]
 	path = Adamantite
 	url = https://github.com/Fy-nite/Adamantite
-[submodule "Prism/StarChart"]
-	path = Prism/StarChart
-	url = https://github.com/fy-nite/StarChart
-[submodule "Prism/VBlank"]
-	path = Prism/VBlank
-	url = https://github.com/fy-nite/VBlank

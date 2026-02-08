@@ -23,6 +23,7 @@ using static SharpIR.CSharpParser;
 using VBlank;
 using Adamantite.Util;
 using VBlank.Abstractions;
+using Color = Microsoft.Xna.Framework.Color;
 
 namespace VBlank
 {
@@ -92,7 +93,7 @@ namespace VBlank
         // Optionally host a native C# game implementing IConsoleGame
         private Adamantite.GFX.IConsoleGame? _nativeGame;
         // Console overlay text commands (printed via SpriteFont on top of the pixel buffer)
-        private readonly List<(string text, int x, int y, Color color)> _consoleTexts = new();
+        private readonly List<(string text, int x, int y, Microsoft.Xna.Framework.Color color)> _consoleTexts = new();
 
         // State used for fullscreen toggling and keyboard detection
         KeyboardState _prevKeyboardState;
