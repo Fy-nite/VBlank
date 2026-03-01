@@ -566,7 +566,7 @@ namespace VBlank
                         // If the next value is extremely close to the target, snap to target to avoid tiny residuals
                         if (Math.Abs(next - target) <= Epsilon) next = target;
                         try { sound.SetBusVolume("Master", next); } catch { }
-                        Console.WriteLine("VBlank Audio Engine volume lerp: current=" + current + " target=" + target + " next=" + next);
+                        // Console.WriteLine("VBlank Audio Engine volume lerp: current=" + current + " target=" + target + " next=" + next);
                     }
                 }
             }
