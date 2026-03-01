@@ -20,6 +20,19 @@ namespace VBlank.AudioEngine
             }
         }
 
+        /// <summary>
+        /// Initialize the sound subsystem without a ContentManager.
+        /// This uses the parameterless SoundSystem ctor which supports
+        /// creating SoundEffect instances from streams.
+        /// </summary>
+        public static void Initialize()
+        {
+            if (Sound == null)
+            {
+                Sound = new SoundSystem();
+            }
+        }
+
         public static void Shutdown()
         {
             if (Sound != null)

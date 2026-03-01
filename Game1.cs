@@ -108,6 +108,10 @@ namespace VBlank
         public int BufferWidth => _bufferWidth;
         public int BufferHeight => _bufferHeight;
 
+        // Expose the underlying GraphicsDevice for helpers or hosted games
+        public GraphicsDevice EngineGraphicsDevice => GraphicsDevice;
+
+        public static AsmoGameEngine Instance { get; set; }
 
         private Surface? _sdlSurface;
         private bool _useSdl = false;
@@ -116,8 +120,13 @@ namespace VBlank
         private readonly ConcurrentQueue<Action> _renderQueue = new ConcurrentQueue<Action>();
         private readonly object _graphicsLock = new object();
 
+        // Audio focus handling: target/master lerp state
+        private float _audioTargetVolume = 1f;
+        private float _audioLerpSpeed = 2f; // units per second
+
         public AsmoGameEngine(string name, int width, int height, float scale = 0.75f)
         {
+            Instance = this;
             // set name, width and height based on parameters
             // Detect backend; we still construct MonoGame GraphicsDeviceManager by default but log init failures.
             var backend = DetectBackend();
@@ -187,6 +196,24 @@ namespace VBlank
             {
                 ApplyWindowPolicy();
                 Window.ClientSizeChanged += OnClientSizeChanged;
+                // Lerp master volume down when window is deactivated (tabbed out), restore when activated
+                    try
+                    {
+                        Activated += (s, e) =>
+                        {
+                            _audioTargetVolume = 1f;
+                            Console.WriteLine("Window.Activated: audio target -> 1.0");
+                        };
+                        Deactivated += (s, e) =>
+                        {
+                            _audioTargetVolume = 0.1f;
+                            Console.WriteLine("Window.Deactivated: audio target -> 0.3");
+                        };
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine("Warning: failed to hook window focus events: " + ex.Message);
+                    }
             }
             catch
             {
@@ -382,6 +409,37 @@ namespace VBlank
                     // Fallback to naive SetData when explicit rectangle fails
                     DebugUtil.Debug("ASMO: Texture2D.SetData with rectangle failed; falling back to full SetData");
                     _screenTexture.SetData(_canvas.PixelData);
+                    // Load image assets from VFS into AssetCache (PNG/JPG).
+                    try
+                    {
+                        var vfs = Adamantite.VFS.VFSGlobal.Manager;
+                        if (vfs != null)
+                        {
+                            foreach (var fi in vfs.Enumerate("/assets"))
+                            {
+                                var name = fi.Name ?? string.Empty;
+                                if (string.IsNullOrEmpty(name)) continue;
+                                string extension = (System.IO.Path.GetExtension(name) ?? string.Empty).ToLowerInvariant();
+                                if (extension != ".png" && extension != ".jpg" && extension != ".jpeg" && extension != ".bmp") continue;
+                                try
+                                {
+                                    var path = "/assets/" + name;
+                                    var tex = Adamantite.GFX.TextureLoader.LoadTextureFromVfs(GraphicsDevice, path);
+                                    if (tex != null)
+                                    {
+                                        var key = System.IO.Path.GetFileNameWithoutExtension(name);
+                                        AssetCache.Register(key, tex);
+                                        DebugUtil.Debug($"ASMO: Loaded asset via VFS: {name} as key={key}");
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    DebugUtil.Debug("ASMO: failed loading asset " + name + " -> " + ex.Message);
+                                }
+                            }
+                        }
+                    }
+                    catch { }
                 }
             }
             else
@@ -392,7 +450,6 @@ namespace VBlank
             }
 
             // Initialize audio subsystem with the game's Content manager so audio assets can be loaded
-            Subsystem.Initialize(Content);
             // If a native game is hosted, initialize it instead of running the IR runtime
             if (_nativeGame != null)
             {
@@ -400,6 +457,8 @@ namespace VBlank
             }
             else
             {
+                // it's the games job to initialize audio if they want it, but we'll initialize the subsystem here so it's ready if IR want's it.
+                Subsystem.Initialize(Content);
                 // Run the IR now that the pixel buffer and texture are initialized
                 _runtime.Run();
             }
@@ -429,6 +488,7 @@ namespace VBlank
 
         protected override void Update(GameTime gameTime)
         {
+            if (Environment.GetEnvironmentVariable("ASMO_DEBUG_UPDATES") == "1") Console.WriteLine("AsmoGameEngine.Update");
             var keyboard = Keyboard.GetState();
             // Alt+Enter fullscreen toggle when enabled by policy
             if (_windowPolicy.AltEnterToggle)
@@ -476,6 +536,41 @@ namespace VBlank
             // Update fps counter
             _fpsCounter.Tick(gameTime.ElapsedGameTime.TotalSeconds);
             _fpsDisplay = _fpsCounter.Fps;
+
+            // Smoothly lerp master bus volume toward the target when focus changes
+            try
+            {
+                var sound = VBlank.AudioEngine.Subsystem.Sound;
+                if (sound != null)
+                {
+                    // Ensure we respond to focus changes even if window events didn't fire on this platform
+                    try
+                    {
+                        float focusTarget = this.IsActive ? 1f : 0.1f;
+                        if (Math.Abs(_audioTargetVolume - focusTarget) > 0.0001f)
+                        {
+                            _audioTargetVolume = focusTarget;
+                            Console.WriteLine("Audio focus fallback: set _audioTargetVolume -> " + focusTarget);
+                        }
+                    }
+                    catch { }
+
+                    float current = sound.Master.Volume;
+                    float target = _audioTargetVolume;
+                    float dt = (float)gameTime.ElapsedGameTime.TotalSeconds;
+                    const float Epsilon = 1e-6f;
+                    if (Math.Abs(current - target) > Epsilon)
+                    {
+                        float t = Math.Clamp(dt * _audioLerpSpeed, 0f, 1f);
+                        float next = Microsoft.Xna.Framework.MathHelper.Lerp(current, target, t);
+                        // If the next value is extremely close to the target, snap to target to avoid tiny residuals
+                        if (Math.Abs(next - target) <= Epsilon) next = target;
+                        try { sound.SetBusVolume("Master", next); } catch { }
+                        Console.WriteLine("VBlank Audio Engine volume lerp: current=" + current + " target=" + target + " next=" + next);
+                    }
+                }
+            }
+            catch { }
 
             if (_canvas != null)
             {
@@ -868,7 +963,11 @@ namespace VBlank
                     }
                 }
                 _spriteBatch.End();
-            
+                // Allow hosted native game to draw using engine SpriteBatch if it supports it.
+                if (_nativeGame is Adamantite.GFX.IConsoleGameWithSpriteBatch sbGame)
+                {
+                    try { sbGame.Draw(_spriteBatch, _font, _scale); } catch { }
+                }
 
             base.Draw(gameTime);
         }
@@ -1091,6 +1190,34 @@ namespace VBlank
                 return null;
             });
             return runtime;
+        }
+    }
+
+    // Minimal local AssetCache shim to ensure AssetCache.Register can be called from this file.
+    // This stores Texture2D instances by key and avoids a compilation error when the real
+    // AssetCache isn't available in the current build context.
+    static class AssetCache
+    {
+        private static readonly Dictionary<string, Texture2D> _cache = new Dictionary<string, Texture2D>();
+        private static readonly object _lock = new object();
+
+        public static void Register(string key, Texture2D tex)
+        {
+            if (string.IsNullOrEmpty(key) || tex == null) return;
+            lock (_lock)
+            {
+                _cache[key] = tex;
+            }
+        }
+
+        public static bool TryGet(string key, out Texture2D tex)
+        {
+            tex = null;
+            if (string.IsNullOrEmpty(key)) return false;
+            lock (_lock)
+            {
+                return _cache.TryGetValue(key, out tex);
+            }
         }
     }
 }

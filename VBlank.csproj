@@ -64,11 +64,11 @@
 	<PackageReference Include="Microsoft.CSharp" Version="4.7.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="Iridion-core\OCRuntime\OCRuntime.csproj" />
-    <ProjectReference Include="Iridion-core\Runtimes\SharpIR\SharpIR.csproj" />
-    <ProjectReference Include="Adamantite\Adamantite.CSharp\Adamantite.csproj" />
-    <ProjectReference Include="VBlank.Abstractions\VBlank.Abstractions.csproj" />
-
+    <ProjectReference Include="Adamantite/Iridion-core/OCRuntime/OCRuntime.csproj" />
+    <ProjectReference Include="Adamantite/Iridion-core/Runtimes/SharpIR/SharpIR.csproj" />
+    <ProjectReference Include="Adamantite/Adamantite.CSharp/Adamantite.csproj" />
+    <ProjectReference Include="VBlank.Abstractions/VBlank.Abstractions.csproj" />
+  <Compile Remove="Adamantite\**\*" />
   </ItemGroup>
   <ItemGroup>
     <None Update="Content\Main.OIR">
